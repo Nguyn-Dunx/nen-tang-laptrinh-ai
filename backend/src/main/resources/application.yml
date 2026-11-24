@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: codelearn-backend
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+  flyway:
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+
+app:
+  cors:
+    allowed-origins: ${FRONTEND_ORIGINS:}
+
+logging:
+  pattern:
+    level: '%5p [traceId=%X{traceId:-}]'

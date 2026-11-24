@@ -1,0 +1,319 @@
+openapi: 3.0.3
+info:
+  title: CodeLearn API
+  version: 0.1.0
+  description: Hợp đồng API cho danh mục khóa học, bài học và kiểm tra trạng thái dịch vụ.
+servers:
+  - url: http://localhost:8080
+    description: Backend cục bộ
+tags:
+  - name: Content
+    description: Khóa học và bài học đã xuất bản.
+  - name: Health
+    description: Trạng thái ứng dụng và kết nối cơ sở dữ liệu.
+paths:
+  /api/v1/health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Kiểm tra API có phản hồi
+      responses:
+        '200':
+          description: API có thể xử lý yêu cầu HTTP.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: UP
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/courses:
+    get:
+      tags: [Content]
+      operationId: listCourses
+      summary: Liệt kê khóa học đã xuất bản
+      description: Kết quả sắp xếp theo slug tăng dần. Trang vượt phạm vi trả về danh sách rỗng.
+      parameters:
+        - name: page
+          in: query
+          description: Chỉ số trang bắt đầu từ 0.
+          schema:
+            type: integer
+            format: int32
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          description: Số khóa học tối đa trên một trang.
+          schema:
+            type: integer
+            format: int32
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Trang khóa học đã xuất bản.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CoursePage'
+        '400':
+          $ref: '#/components/responses/InvalidPagination'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/courses/{courseSlug}:
+    get:
+      tags: [Content]
+      operationId: getCourse
+      summary: Lấy khóa học và mục lục bài học
+      parameters:
+        - $ref: '#/components/parameters/CourseSlug'
+      responses:
+        '200':
+          description: Chi tiết khóa học cùng danh sách bài đã xuất bản theo thứ tự học.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetail'
+        '404':
+          $ref: '#/components/responses/ContentNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/courses/{courseSlug}/lessons/{lessonSlug}:
+    get:
+      tags: [Content]
+      operationId: getLesson
+      summary: Lấy nội dung bài học đã xuất bản
+      parameters:
+        - $ref: '#/components/parameters/CourseSlug'
+        - name: lessonSlug
+          in: path
+          required: true
+          description: Slug của bài học trong khóa học.
+          schema:
+            type: string
+          example: xin-chao-python
+      responses:
+        '200':
+          description: Nội dung bài học dạng Markdown.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LessonDetail'
+        '404':
+          $ref: '#/components/responses/ContentNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /actuator/health/liveness:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      summary: Kiểm tra trạng thái sống của ứng dụng
+      responses:
+        '200':
+          $ref: '#/components/responses/ProbeUp'
+        '503':
+          $ref: '#/components/responses/ProbeUnavailable'
+  /actuator/health/readiness:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      summary: Kiểm tra ứng dụng sẵn sàng nhận yêu cầu
+      description: Kiểm tra cả trạng thái sẵn sàng của ứng dụng và kết nối PostgreSQL.
+      responses:
+        '200':
+          $ref: '#/components/responses/ProbeUp'
+        '503':
+          $ref: '#/components/responses/ProbeUnavailable'
+components:
+  parameters:
+    CourseSlug:
+      name: courseSlug
+      in: path
+      required: true
+      description: Slug của khóa học.
+      schema:
+        type: string
+      example: python-co-ban
+  headers:
+    RequestId:
+      description: ID yêu cầu do backend tạo, trùng với traceId trong lỗi API.
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    InvalidPagination:
+      description: Tham số phân trang không hợp lệ. Mã lỗi là VALIDATION_ERROR.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    ContentNotFound:
+      description: Khóa học hoặc bài học không tồn tại hoặc chưa xuất bản. Mã lỗi là NOT_FOUND.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    InternalError:
+      description: Lỗi xử lý nội bộ. Mã lỗi là INTERNAL_ERROR.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    ProbeUp:
+      description: Kiểm tra thành công.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HealthStatus'
+        application/vnd.spring-boot.actuator.v3+json:
+          schema:
+            $ref: '#/components/schemas/HealthStatus'
+    ProbeUnavailable:
+      description: Thành phần được kiểm tra đang DOWN hoặc OUT_OF_SERVICE.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HealthStatus'
+        application/vnd.spring-boot.actuator.v3+json:
+          schema:
+            $ref: '#/components/schemas/HealthStatus'
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          example: UP
+    ProblemDetail:
+      type: object
+      required: [type, title, status, code, traceId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          example: about:blank
+        title:
+          type: string
+          example: Bad Request
+        status:
+          type: integer
+          format: int32
+          example: 400
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+          example: /api/v1/courses
+        code:
+          type: string
+          description: Mã lỗi ổn định cho frontend.
+          example: VALIDATION_ERROR
+        traceId:
+          type: string
+          format: uuid
+          example: 7fc54937-9385-4df5-9976-494338298a97
+    CourseSummary:
+      type: object
+      required: [slug, title, summary]
+      properties:
+        slug:
+          type: string
+          example: python-co-ban
+        title:
+          type: string
+          example: Python cơ bản
+        summary:
+          type: string
+          example: Làm quen với cú pháp Python qua các ví dụ ngắn.
+    CoursePage:
+      type: object
+      required: [items, page, size, totalElements]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseSummary'
+        page:
+          type: integer
+          format: int32
+          minimum: 0
+        size:
+          type: integer
+          format: int32
+          minimum: 1
+          maximum: 50
+        totalElements:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Tổng số khóa học đã xuất bản.
+    CourseDetail:
+      allOf:
+        - $ref: '#/components/schemas/CourseSummary'
+        - type: object
+          required: [lessons]
+          properties:
+            lessons:
+              type: array
+              items:
+                $ref: '#/components/schemas/LessonSummary'
+    LessonSummary:
+      type: object
+      required: [slug, title, position]
+      properties:
+        slug:
+          type: string
+          example: xin-chao-python
+        title:
+          type: string
+          example: Xin chào, Python
+        position:
+          type: integer
+          format: int32
+          minimum: 1
+          example: 1
+    LessonDetail:
+      allOf:
+        - $ref: '#/components/schemas/LessonSummary'
+        - type: object
+          required: [courseSlug, bodyMarkdown]
+          properties:
+            courseSlug:
+              type: string
+              example: python-co-ban
+            bodyMarkdown:
+              type: string
+              description: Mã nguồn Markdown của bài học.
