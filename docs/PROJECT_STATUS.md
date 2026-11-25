@@ -1,83 +1,51 @@
-# Hiện trạng mã nguồn dự án
+- **Mục đích** Báo cáo tiến độ, kiến trúc và mức sẵn sàng của từng module.
+- **Đối tượng đọc** Leader, dev, frontend và QA.
+- **Cập nhật lần cuối** 2026-11-25
+- **Owner** Backend
 
-Tài liệu này ghi lại những gì đang có trong repository tại thời điểm rà soát. Nội dung được tổng hợp từ mã nguồn, cấu hình, OpenAPI, kiểm thử và roadmap; các mục trong roadmap là kế hoạch, không được xem là chức năng đã triển khai.
+# Hiện trạng backend
 
-## Tóm tắt
+Backend dùng Java 21, Spring Boot 4.1, JDBC, PostgreSQL 16 và Flyway. Một artifact chạy API và worker riêng. Redis hỗ trợ hàng đợi và quota Sandbox. [Kiến trúc và ranh giới](ARCHITECTURE.md) · [ADR worker](adr/0002-sandbox-worker-and-queue.md)
 
-Repository hiện là **backend nền tảng học lập trình**, viết bằng Java 21 và Spring Boot 4.1.0, dùng PostgreSQL, JDBC và Flyway. Ngoài catalog và identity theo phiên, đã có API nhận bài Python, hàng đợi Redis và worker riêng tích hợp Judge0 qua adapter. Việc chạy/chấm với Judge0 thật chưa được xác minh; không xem kiểm thử stub là nghiệm thu sandbox cách ly.
+| Module | Đã triển khai | Tiếp theo |
+| --- | --- | --- |
+| Khóa học (`content`) | API đọc danh mục, khóa và bài Markdown đã xuất bản. Lọc khóa/bài nháp và có test phân trang, thứ tự. | API admin biên tập và xuất bản, 6–8 bài pilot, hợp đồng bài học–bài tập. |
+| Tài khoản (`identity`) | Đăng ký email, Argon2id, phiên PostgreSQL, CSRF, hồ sơ, đăng xuất và vai trò. | Hạn mức đăng nhập công khai, xác minh và phục hồi tài khoản, quản lý quyền. |
+| Bài tập và runner (`sandbox`) | Đọc bài tập cùng test công khai. Có port `SandboxClient`, Judge0 adapter, giới hạn HTTP và output. | Nghiệm thu Judge0 cô lập, tài nguyên và mạng. |
+| Bài nộp (`submission`) | Nộp Python, xem trạng thái, lịch sử và chi tiết theo chủ sở hữu. Worker chấm thử qua stub, có lease, retry và recovery. | Nối frontend qua slug bài học. Kiểm tra tải, restart và vận hành trên staging. |
+| Hạ tầng HTTP (`common`) | Health, request ID, CORS, whitelist route và Problem Detail. | Cảnh báo và giám sát theo từng tiến trình trên staging. |
+| Lộ trình (`learning`) và AI (`tutor`) | Thiết kế trong roadmap. | Làm sau mốc Khóa học và Sandbox. |
 
-Chưa có mã frontend trong repository. CMS, roadmap, theo dõi tiến độ và trợ lý AI hiện mới nằm trong lộ trình. Sandbox chỉ hỗ trợ Python; worker cần Judge0 riêng và chưa được nghiệm thu bằng Judge0 thật.
+[OpenAPI](api/openapi.yaml) · [Kế hoạch Khóa học 6 tuần](COURSE_MODULE_PLAN.md)
 
-## Những gì API hiện làm được
+## Luồng Sandbox
 
-| API | Hiện trạng |
-| --- | --- |
-| `GET /api/v1/health` | Trả trạng thái API (`UP`). |
-| `GET /actuator/health/liveness` | Probe kiểm tra tiến trình còn hoạt động. |
-| `GET /actuator/health/readiness` | Probe sẵn sàng, gồm trạng thái PostgreSQL. |
-| `GET /api/v1/courses?page=0&size=20` | Liệt kê khóa đã xuất bản, sắp theo slug, phân trang; kích thước trang tối đa 50. |
-| `GET /api/v1/courses/{courseSlug}` | Trả thông tin khóa và danh sách bài đã xuất bản theo vị trí. |
-| `GET /api/v1/courses/{courseSlug}/lessons/{lessonSlug}` | Trả thông tin bài cùng nội dung Markdown. |
-| `GET /api/v1/exercises/{exerciseId}` | Đọc bài tập đã xuất bản cùng test công khai; công khai, không trả test ẩn hoặc số lượng test ẩn. |
-| `POST /api/v1/exercises/{exerciseId}/submissions` | Học viên đã đăng nhập nộp Python; kiểm tra giới hạn và trả `202 QUEUED` sau khi ghi DB, enqueue ID qua Redis. |
-| `GET /api/v1/submissions/{submissionId}` | Poll trạng thái/kết quả của submission thuộc người dùng hiện tại. |
-| `GET /api/v1/exercises/{exerciseId}/submissions` | Lịch sử submission của người dùng hiện tại cho bài tập. |
-| `GET /api/v1/submissions/{submissionId}/detail` | Xem lại mã nguồn và kết quả test của submission thuộc người dùng hiện tại. |
-
-Các truy vấn catalog chỉ lấy nội dung đã xuất bản. Khóa nháp, bài nháp, hoặc bài đã xuất bản nhưng thuộc khóa nháp đều không được truy cập qua API công khai và trả `404`. Submission dùng session hiện tại, CSRF cho request ghi, và vai trò học viên trở lên. Polling đã có; SSE chưa có.
-
-Lỗi được chuẩn hóa theo `application/problem+json`, có `code` và `traceId`. Mỗi request có `X-Request-Id`; giá trị này cũng được đưa vào MDC để đối chiếu log. Các route ngoài danh sách cho phép bị từ chối. CORS cho API được cấu hình theo danh sách origin, profile phát triển mặc định cho phép frontend ở cổng 3000.
-
-## Mã nguồn hiện có
-
-### Backend
-
-- `backend/src/main/java/vn/edu/codelearn/platform/CodeLearnApplication.java`: điểm khởi chạy Spring Boot.
-- `.../content/CatalogController.java`: ba endpoint đọc khóa học và bài học.
-- `.../content/CatalogService.java`: xử lý truy vấn danh mục, phân trang và trường hợp không tìm thấy.
-- `.../content/CatalogRepository.java`: truy vấn PostgreSQL bằng `JdbcClient`, lọc nội dung đã xuất bản.
-- `.../content/CatalogViews.java`: DTO/record cho danh sách, chi tiết khóa học và bài học.
-- `.../sandbox/ExerciseController.java`, `ExerciseService.java`, `ExerciseRepository.java`, `ExerciseViews.java`: API đọc bài tập đã xuất bản; truy vấn test công khai qua view `test_case_public`.
-- `.../submission/SubmissionController.java` và các lớp dịch vụ/repository: tiếp nhận, giới hạn, lịch sử, polling và chi tiết; API chỉ enqueue ID, không gọi Judge0.
-- `.../sandbox/Judge0Client.java`, `.../submission/SubmissionWorker.java`: adapter Judge0 và worker chỉ bật với profile `worker`; worker xử lý submission, retry/recovery và ghi kết quả.
-- `.../common/SecurityConfiguration.java`: cấu hình session, CSRF, quyền submission, whitelist route và CORS.
-- `.../common/HealthController.java`: endpoint health của ứng dụng.
-- `.../common/RequestIdFilter.java`: sinh request ID, gắn response header và MDC.
-- `.../common/ApiExceptionHandler.java`: ánh xạ lỗi HTTP thành payload Problem Detail có mã lỗi ổn định.
-
-### Cơ sở dữ liệu và cấu hình
-
-- `backend/src/main/resources/db/migration/V1__create_catalog.sql`: tạo bảng `course` và `lesson`, ràng buộc slug/vị trí, quan hệ khóa-bài và cột thời điểm xuất bản.
-- `backend/src/main/resources/db/demo/R__seed_demo_catalog.sql`: dữ liệu mẫu Python cơ bản gồm “Xin chào, Python” và “Biến và giá trị”, chỉ được nạp trong profile `dev`.
-- `application.yml` và `application-dev.yml`: cấu hình datasource, Flyway, cổng máy chủ, health probe và CORS; profile dev đọc `.env` phía trên thư mục backend.
-- `infra/docker-compose.dev.yml` và `.env.example`: PostgreSQL 16 và Redis cho môi trường phát triển.
-- `backend/pom.xml`, Maven Wrapper: cấu hình build Java 21 và các phụ thuộc Spring Web MVC, Security, Validation, Actuator, JDBC, Flyway, PostgreSQL và Redis.
-
-### Hợp đồng, kiểm thử và CI
-
-- `docs/api/openapi.yaml`: hợp đồng OpenAPI cho health, danh mục, identity và API đọc bài tập.
-- `backend/src/test/java/.../CatalogIntegrationTest.java`: integration test cho health/readiness, phân trang, thứ tự bài, ẩn nội dung nháp, lỗi validation, từ chối truy cập và CORS. Nhóm test cần PostgreSQL và được bật khi có `TEST_DB_URL`.
-- `backend/src/test/java/.../ExerciseIntegrationTest.java`: kiểm tra quyền đọc công khai, xuất bản, test công khai và không rò rỉ dữ liệu canary.
-- `backend/src/test/java/.../SubmissionIntegrationTest.java`: kiểm tra xác thực, giới hạn submission, quyền sở hữu, polling/history/detail và không rò rỉ test ẩn.
-- `backend/src/test/java/.../SubmissionQueueIntegrationTest.java`: kiểm tra submission đã commit và queue Redis nhận đúng ID.
-- `backend/src/test/java/.../GradingServiceTest.java`: kiểm tra grading chạy qua fake `SandboxClient`, bao gồm test ẩn và dừng khi Compile Error.
-- Kiểm tra gần nhất: `./mvnw --batch-mode --no-transfer-progress verify` với PostgreSQL test riêng và Redis: **35 test, 0 failure, 0 error, 0 skipped**; Spotless/Checkstyle đạt. Judge0 thật không được chạy.
-- `backend/src/test/java/.../GradingRulesTest.java` và `Judge0ClientTest.java`: kiểm tra quy tắc chấm và giao tiếp Judge0 bằng HTTP stub cục bộ; không chạy mã trong Judge0 thật.
-- `backend/src/test/resources/catalog-fixtures.sql`: dữ liệu fixture cho kiểm thử.
-- `.github/workflows/backend-ci.yml`: GitHub Actions dùng Java 21 và PostgreSQL 16, chạy `./mvnw verify` khi có thay đổi liên quan.
-
-## Giới hạn và phần chưa nghiệm thu
-
-Judge0 thật, cách ly môi trường/mạng/tài nguyên, chạy N2/N4 và kiểm thử tải chưa được xác minh. Không khởi chạy worker trên môi trường dùng chung để thực thi mã tùy ý. SSE, giao diện frontend; CMS và quy trình duyệt/xuất bản; blog; roadmap/đồ thị lộ trình; lưu tiến độ học; playground; trợ lý AI/LLM; staging/production và giám sát vận hành chưa được triển khai.
-
-Roadmap 16 tuần trong `docs/ROADMAP.md` mô tả các hạng mục dự kiến, tiêu chí nghiệm thu và mục tiêu nội dung. Đây là kế hoạch cho các bước tiếp theo, không phải bằng chứng các tính năng đó đã có trong backend.
-
-## Cách chạy bản phát triển
-
-README hướng dẫn sao chép `.env.example` thành `.env`, khởi động PostgreSQL và Redis bằng Docker Compose, sau đó chạy API từ `backend`:
-
-```bash
-bash ./mvnw -Dspring-boot.run.profiles=dev spring-boot:run
+```mermaid
+sequenceDiagram
+    participant FE as Frontend
+    participant API as API
+    participant PG as PostgreSQL
+    participant R as Redis
+    participant W as Worker
+    participant J as Judge0
+    FE->>API: Nộp bài Python
+    API->>PG: Lưu QUEUED
+    API->>R: Enqueue ID sau commit
+    API-->>FE: 202 và submission_id
+    R-->>W: ID bài nộp
+    W->>PG: Claim attempt và gia hạn lease trước mỗi lượt
+    W->>J: Chạy mã với giới hạn
+    J-->>W: Kết quả thực thi
+    W->>PG: Lưu verdict nếu attempt vẫn hợp lệ
+    FE->>API: Poll trạng thái của bài mình nộp
 ```
 
-Worker chạy thành tiến trình riêng với profile `worker` và cần `JUDGE0_BASE_URL`, `JUDGE0_PYTHON_LANGUAGE_ID` cùng biến kết nối DB/Redis. Các URL và payload cụ thể được mô tả trong `docs/api/openapi.yaml`; hướng dẫn an toàn và trạng thái nghiệm thu sandbox ở `docs/ENVIRONMENT_SETUP.md`.
+V7 cấp 16 giới hạn Sandbox ở mọi môi trường. V8 cập nhật lease. PostgreSQL vẫn giữ bài khi mất tín hiệu Redis, còn worker kiểm tra attempt trước khi ghi trạng thái và kết quả. [Triển khai](DEPLOYMENT.md) · [Bảo mật Sandbox](sandbox/SECURITY.md)
+
+Đã chạy `mvn verify` với PostgreSQL 16.16 và Redis 7, đạt 40 test, không skip, lint và format đạt. Đã kiểm tra migration V6 → V8 không dùng dữ liệu demo và giữ cấu hình đã tùy chỉnh. Docker Compose trả readiness và bài học mẫu. Smoke hai tiến trình đi từ API qua Redis đến worker. Worker chấm `ACCEPTED` với Judge0 HTTP stub và giữ dữ liệu test ẩn ở backend.
+
+## Đánh giá
+
+- **Sẵn sàng cho tích hợp nội bộ.** Catalog và Identity có API chạy được. Sandbox có API, xử lý trạng thái, migration và kiểm thử bằng PostgreSQL, Redis cùng HTTP stub. Điều này hỗ trợ phát triển frontend và module Khóa học.
+- **Cần hoàn tất trước pilot.** Xác minh Judge0 thực trên máy cô lập, điều kiện mạng/tài nguyên, tải 30 bài nộp, Redis/worker restart, khám phá bài tập từ bài học, kiểm soát đăng nhập công khai và khả năng restore.
+- **Chi phí vận hành chính.** API, worker, PostgreSQL, Redis và Judge0 cần theo dõi riêng. Theo dõi tuổi hàng đợi, số retry, lỗi Judge0 và quyền truy cập trước khi tăng số worker. [Rà soát bộ khung](RELEASE_READINESS.md)

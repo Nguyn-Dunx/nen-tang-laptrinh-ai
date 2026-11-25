@@ -42,6 +42,8 @@ Trên macOS/Linux, export ba biến `TEST_DB_*` tương ứng rồi chạy `bash
 
 Compose dev khởi động PostgreSQL và Redis. API trong profile `dev` nhận submission và đưa ID vào Redis; chạy API không tự chạy mã học viên. Worker là tiến trình riêng, profile `worker`, và cần kết nối tới một Judge0 đã được dựng trong môi trường cô lập.
 
+Flyway V7 cấp đủ giới hạn Sandbox ở cả môi trường ngoài `dev` và giữ giá trị đã tùy chỉnh. V8 thêm lease cho worker. Khởi động API và áp xong migration trước khi bật worker.
+
 Không khởi động worker trỏ tới Judge0 dùng chung hoặc production để thử mã tùy ý. Chưa xác minh Judge0 thật, cô lập mạng/tài nguyên, hay các bài nghiệm thu N2/N4; hiện CI và test local chỉ dùng HTTP stub an toàn.
 
 Worker cần các biến `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JUDGE0_BASE_URL` và `JUDGE0_PYTHON_LANGUAGE_ID`. Chỉ đặt `JUDGE0_AUTH_TOKEN` nếu Judge0 yêu cầu. Chạy riêng trong terminal đã được cấu hình các biến môi trường:
