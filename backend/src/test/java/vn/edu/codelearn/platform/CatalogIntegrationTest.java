@@ -22,20 +22,20 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 @EnabledIfEnvironmentVariable(named = "TEST_DB_URL", matches = "jdbc:postgresql:.+")
-@SpringBootTest(properties = {
-    "spring.datasource.url=${TEST_DB_URL}",
-    "spring.datasource.username=${TEST_DB_USER}",
-    "spring.datasource.password=${TEST_DB_PASSWORD}",
-    "app.cors.allowed-origins=http://localhost:3000"
-})
+@SpringBootTest(
+        properties = {
+            "spring.datasource.url=${TEST_DB_URL}",
+            "spring.datasource.username=${TEST_DB_USER}",
+            "spring.datasource.password=${TEST_DB_PASSWORD}",
+            "app.cors.allowed-origins=http://localhost:3000"
+        })
 @ActiveProfiles("dev")
 @AutoConfigureMockMvc
 @Transactional
 @Sql("/catalog-fixtures.sql")
 class CatalogIntegrationTest {
 
-    @Autowired
-    private MockMvc mvc;
+    @Autowired private MockMvc mvc;
 
     @Test
     void should_report_liveness_and_database_readiness() throws Exception {
@@ -72,7 +72,8 @@ class CatalogIntegrationTest {
     }
 
     @Test
-    void should_hide_drafts_even_when_a_lesson_is_published_under_a_draft_course() throws Exception {
+    void should_hide_drafts_even_when_a_lesson_is_published_under_a_draft_course()
+            throws Exception {
         mvc.perform(get("/api/v1/courses/draft-fixture"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
@@ -89,8 +90,10 @@ class CatalogIntegrationTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.traceId").isNotEmpty())
-                .andExpect(result -> assertThat(result.getResponse().getContentAsString())
-                        .contains(result.getResponse().getHeader("X-Request-Id")));
+                .andExpect(
+                        result ->
+                                assertThat(result.getResponse().getContentAsString())
+                                        .contains(result.getResponse().getHeader("X-Request-Id")));
     }
 
     @Test
@@ -105,11 +108,15 @@ class CatalogIntegrationTest {
 
     @Test
     void should_allow_only_configured_frontend_origins() throws Exception {
-        mvc.perform(options("/api/v1/courses")
-                        .header(HttpHeaders.ORIGIN, "http://localhost:3000")
-                        .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
+        mvc.perform(
+                        options("/api/v1/courses")
+                                .header(HttpHeaders.ORIGIN, "http://localhost:3000")
+                                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "GET"))
                 .andExpect(status().isOk())
-                .andExpect(header().string(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, "http://localhost:3000"));
+                .andExpect(
+                        header().string(
+                                        HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN,
+                                        "http://localhost:3000"));
         mvc.perform(get("/api/v1/courses").header(HttpHeaders.ORIGIN, "https://example.invalid"))
                 .andExpect(status().isForbidden())
                 .andExpect(header().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));

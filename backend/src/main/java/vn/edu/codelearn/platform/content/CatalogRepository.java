@@ -9,8 +9,12 @@ import org.springframework.stereotype.Repository;
 @Repository
 class CatalogRepository {
 
-    private static final RowMapper<CatalogViews.CourseSummary> COURSE_SUMMARY = (row, index) ->
-            new CatalogViews.CourseSummary(row.getString("slug"), row.getString("title"), row.getString("summary"));
+    private static final RowMapper<CatalogViews.CourseSummary> COURSE_SUMMARY =
+            (row, index) ->
+                    new CatalogViews.CourseSummary(
+                            row.getString("slug"),
+                            row.getString("title"),
+                            row.getString("summary"));
 
     private final JdbcClient jdbc;
 
@@ -19,7 +23,8 @@ class CatalogRepository {
     }
 
     List<CatalogViews.CourseSummary> findPublishedCourses(int size, long offset) {
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 SELECT slug, title, summary
                 FROM course
                 WHERE published_at IS NOT NULL
@@ -39,7 +44,8 @@ class CatalogRepository {
     }
 
     Optional<CatalogViews.CourseSummary> findPublishedCourse(String slug) {
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 SELECT slug, title, summary
                 FROM course
                 WHERE slug = :slug AND published_at IS NOT NULL
@@ -50,7 +56,8 @@ class CatalogRepository {
     }
 
     List<CatalogViews.LessonSummary> findPublishedLessons(String courseSlug) {
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 SELECT lesson.slug, lesson.title, lesson.position
                 FROM lesson
                 JOIN course ON course.id = lesson.course_id
@@ -59,13 +66,18 @@ class CatalogRepository {
                 ORDER BY lesson.position
                 """)
                 .param("courseSlug", courseSlug)
-                .query((row, index) -> new CatalogViews.LessonSummary(
-                        row.getString("slug"), row.getString("title"), row.getInt("position")))
+                .query(
+                        (row, index) ->
+                                new CatalogViews.LessonSummary(
+                                        row.getString("slug"),
+                                        row.getString("title"),
+                                        row.getInt("position")))
                 .list();
     }
 
     Optional<CatalogViews.LessonDetail> findPublishedLesson(String courseSlug, String lessonSlug) {
-        return jdbc.sql("""
+        return jdbc.sql(
+                        """
                 SELECT course.slug AS course_slug, lesson.slug, lesson.title, lesson.position, lesson.body_markdown
                 FROM lesson
                 JOIN course ON course.id = lesson.course_id
@@ -74,9 +86,14 @@ class CatalogRepository {
                 """)
                 .param("courseSlug", courseSlug)
                 .param("lessonSlug", lessonSlug)
-                .query((row, index) -> new CatalogViews.LessonDetail(
-                        row.getString("course_slug"), row.getString("slug"), row.getString("title"),
-                        row.getInt("position"), row.getString("body_markdown")))
+                .query(
+                        (row, index) ->
+                                new CatalogViews.LessonDetail(
+                                        row.getString("course_slug"),
+                                        row.getString("slug"),
+                                        row.getString("title"),
+                                        row.getInt("position"),
+                                        row.getString("body_markdown")))
                 .optional();
     }
 }

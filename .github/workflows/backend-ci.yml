@@ -2,24 +2,27 @@ name: Backend CI
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'backend/**'
-      - 'infra/**'
-      - 'docs/api/**'
-      - '.github/workflows/backend-ci.yml'
+    branches: [master]
   pull_request:
-    paths:
-      - 'backend/**'
-      - 'infra/**'
-      - 'docs/api/**'
-      - '.github/workflows/backend-ci.yml'
+    types: [opened, synchronize, reopened, edited]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  pr-title:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Check Conventional Commit title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          printf '%s\n' "$PR_TITLE" > "$RUNNER_TEMP/codelearn-pr-title"
+          sh .githooks/commit-msg "$RUNNER_TEMP/codelearn-pr-title"
+
   verify:
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -54,3 +57,8 @@ jobs:
           cache-dependency-path: backend/pom.xml
       - name: Build and test backend
         run: bash ./mvnw --batch-mode --no-transfer-progress verify
+      - name: Validate Compose configuration
+        working-directory: .
+        run: docker compose --env-file .env.example -f infra/docker-compose.dev.yml --profile app config --quiet
+      - name: Build backend image
+        run: docker build --tag codelearn/backend:ci .

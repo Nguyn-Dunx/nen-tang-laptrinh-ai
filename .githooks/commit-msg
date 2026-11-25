@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+subject=$(sed -n '1p' "$1")
+pattern='^(feat|fix|docs|refactor|test|build|ci|chore)(\([[:alnum:]][[:alnum:]./_-]*\))?!?: [^[:space:]].*$'
+
+if ! printf '%s\n' "$subject" | LC_ALL=C grep -Eq "$pattern"; then
+    printf '%s\n' 'Use Conventional Commits, for example: feat(identity): add email sign-in' >&2
+    exit 1
+fi

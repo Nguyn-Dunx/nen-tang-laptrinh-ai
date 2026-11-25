@@ -31,7 +31,8 @@ class CatalogController {
     }
 
     @GetMapping("/{courseSlug}/lessons/{lessonSlug}")
-    CatalogViews.LessonDetail getLesson(@PathVariable String courseSlug, @PathVariable String lessonSlug) {
+    CatalogViews.LessonDetail getLesson(
+            @PathVariable String courseSlug, @PathVariable String lessonSlug) {
         return catalog.getLesson(courseSlug, lessonSlug);
     }
 }
