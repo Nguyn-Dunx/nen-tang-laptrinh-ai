@@ -95,6 +95,7 @@ class SecurityConfiguration {
                         "/api/v1/courses",
                         "/api/v1/courses/{courseSlug}",
                         "/api/v1/courses/{courseSlug}/lessons/{lessonSlug}",
+                        "/api/v1/exercises/{exerciseId}",
                         "/actuator/health/liveness",
                         "/actuator/health/readiness",
                         AUTH_API + "/csrf")

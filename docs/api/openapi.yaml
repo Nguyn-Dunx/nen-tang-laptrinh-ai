@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: CodeLearn API
   version: 0.1.0
-  description: Hợp đồng API cho tài khoản, danh mục khóa học, bài học và trạng thái dịch vụ.
+  description: Hợp đồng API cho tài khoản, danh mục khóa học, bài học, bài tập đã xuất bản và trạng thái dịch vụ.
 servers:
   - url: http://localhost:8080
     description: Backend cục bộ
@@ -11,6 +11,8 @@ tags:
     description: Đăng ký email, đăng nhập và quản lý phiên hiện tại.
   - name: Content
     description: Khóa học và bài học đã xuất bản.
+  - name: Sandbox
+    description: Bài tập lập trình đã xuất bản và test công khai.
   - name: Health
     description: Trạng thái ứng dụng và kết nối cơ sở dữ liệu.
 paths:
@@ -247,6 +249,42 @@ paths:
                 $ref: '#/components/schemas/LessonDetail'
         '404':
           $ref: '#/components/responses/ContentNotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/exercises/{exerciseId}:
+    get:
+      tags: [Sandbox]
+      operationId: getExercise
+      summary: Lấy bài tập đã xuất bản cùng test công khai
+      description: Bài thuộc lesson hoặc course chưa xuất bản trả về 404. Test ẩn và lời giải tham khảo không được đưa vào response.
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          description: ID bài tập.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Bài tập cùng các test công khai theo thứ tự chạy.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExerciseView'
+        '404':
+          description: Bài tập không tồn tại hoặc lesson/course chưa xuất bản. Mã lỗi là EXERCISE_NOT_FOUND.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
         '500':
           $ref: '#/components/responses/InternalError'
   /actuator/health/liveness:
@@ -545,3 +583,48 @@ components:
             bodyMarkdown:
               type: string
               description: Mã nguồn Markdown của bài học.
+    ExerciseView:
+      type: object
+      required: [id, lessonId, title, language, difficulty, statementMarkdown, starterCode, maxScore, publicTests]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        lessonId:
+          type: integer
+          format: int64
+        title:
+          type: string
+          example: Tính tổng hai số
+        language:
+          type: string
+          example: python
+        difficulty:
+          type: string
+          example: beginner
+        statementMarkdown:
+          type: string
+          description: Đề bài dạng Markdown.
+        starterCode:
+          type: string
+        maxScore:
+          type: integer
+          minimum: 1
+          example: 100
+        publicTests:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTestCase'
+    PublicTestCase:
+      type: object
+      required: [position, stdin, expectedOutput]
+      properties:
+        position:
+          type: integer
+          format: int32
+          minimum: 1
+        stdin:
+          type: string
+        expectedOutput:
+          type: string
