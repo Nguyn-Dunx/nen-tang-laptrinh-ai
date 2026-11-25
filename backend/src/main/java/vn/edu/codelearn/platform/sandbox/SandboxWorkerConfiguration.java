@@ -4,6 +4,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.client.BufferingClientHttpRequestFactory;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestClient;
@@ -24,8 +26,12 @@ class SandboxWorkerConfiguration {
                 java.net.http.HttpClient.newBuilder()
                         .connectTimeout(java.time.Duration.ofMillis(httpTimeoutMs))
                         .build();
-        var requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(java.time.Duration.ofMillis(httpTimeoutMs));
+        var jdkRequestFactory = new JdkClientHttpRequestFactory(httpClient);
+        jdkRequestFactory.setReadTimeout(java.time.Duration.ofMillis(httpTimeoutMs));
+        // Buffer submissions so Judge0's Rails API receives Content-Length instead of chunked JSON.
+        var requestFactory =
+                new BufferingClientHttpRequestFactory(
+                        jdkRequestFactory, (uri, method) -> method == HttpMethod.POST);
         var restClientBuilder =
                 RestClient.builder().baseUrl(baseUrl).requestFactory(requestFactory);
         if (!authToken.isBlank()) {

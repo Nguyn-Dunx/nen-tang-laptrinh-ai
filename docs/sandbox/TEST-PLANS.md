@@ -2,7 +2,7 @@
 
 ## 1. Mục đích và phạm vi
 
-- Đây là kế hoạch kiểm thử và trạng thái bằng chứng. Đã có unit test cho quy tắc chấm, HTTP stub cục bộ cho Judge0 adapter, integration test API/Redis/PostgreSQL; chưa có bằng chứng Judge0 thật, N2/N4 hay tải.
+- Đây là kế hoạch kiểm thử và trạng thái bằng chứng. Đã có unit test cho quy tắc chấm, HTTP stub cục bộ cho Judge0 adapter, integration test API/Redis/PostgreSQL và một lần smoke E2E với Judge0 Docker cục bộ; chưa nghiệm thu N2/N4, tải hay isolation.
 - Phạm vi: kiểm thử SB-02 đến SB-06, UC10, NF-01, NF-02, NF-04, N2, N4 và thiết kế `docs/sandbox/fixtures/`. Ngoài phạm vi (SB-01, SB-07 đến SB-10, ngôn ngữ ngoài Python, kiểm thử frontend/iframe, trợ lý AI, staging/production, giám sát): xem `00-SCOPE.md`.
 - Ba tiêu chí nghiệm thu chính:
   - **N2** (M3, tuần 7–10): đúng verdict trên tối thiểu 30 bài nộp mẫu.
@@ -20,9 +20,9 @@
 - Sandbox unit/integration test cho quy tắc chấm, Judge0 HTTP stub, giới hạn submission, quyền sở hữu và không rò rỉ hidden-test values.
 - CI: `.github/workflows/backend-ci.yml` (Java 21, PostgreSQL 16, Redis; chạy `./mvnw verify`). CI **không** có Judge0 thật.
 
-**CÒN THIẾU:** test tích hợp đầy đủ từ queue đến worker với stub; Judge0 thật, N2/N4, test tải và bằng chứng isolation.
+**CÒN THIẾU:** test tích hợp đầy đủ từ queue đến worker với stub; bộ N2/N4 trên Judge0, test tải và bằng chứng isolation.
 
-**Bằng chứng gần nhất (2026-11-25):** `./mvnw --batch-mode --no-transfer-progress verify` trên DB test riêng: 35 test, 0 failure, 0 error, 0 skipped; Spotless và Checkstyle xanh. Compose config hợp lệ. Không chạy Judge0 thật hoặc mã người dùng trên Judge0.
+**Bằng chứng gần nhất (2026-11-25):** `./mvnw --batch-mode --no-transfer-progress verify` trên DB test riêng: 35 test, 0 failure, 0 error, 0 skipped; Spotless và Checkstyle xanh. Smoke E2E qua API → queue → worker → Judge0 Docker cục bộ: một bài Python (language ID 71) `ACCEPTED`, 10/10 điểm với 2 test; exercise, submission, history và detail lần lượt trả kết quả thành công, giá trị test ẩn không xuất hiện trong response. Đây chỉ là một ca smoke, không thay thế N2/N4, test tải hoặc xác minh isolation.
 
 **Nguyên tắc:**
 - Không `@Disabled` test. Không sửa test cho xanh thay vì sửa lỗi thật.

@@ -52,8 +52,6 @@ final class Judge0Client implements SandboxClient {
         payload.put("memory_limit", request.memoryLimitKb());
         payload.put("max_processes_and_or_threads", request.maxProcesses());
         payload.put("max_file_size", request.maxFileSizeKb());
-        payload.put("enable_per_process_and_thread_time_limit", true);
-        payload.put("enable_per_process_and_thread_memory_limit", true);
         payload.put("enable_network", false);
         payload.put("number_of_runs", 1);
         try {

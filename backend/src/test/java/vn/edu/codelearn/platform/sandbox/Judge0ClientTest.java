@@ -10,19 +10,21 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
 
 class Judge0ClientTest {
 
     private HttpServer server;
     private AtomicReference<String> createBody;
+    private AtomicReference<String> contentLength;
     private AtomicInteger statusPolls;
+    private AtomicReference<String> transferEncoding;
 
     @BeforeEach
     void startStub() throws Exception {
         createBody = new AtomicReference<>();
+        contentLength = new AtomicReference<>();
         statusPolls = new AtomicInteger();
+        transferEncoding = new AtomicReference<>();
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/submissions", exchange -> handle(exchange));
         server.start();
@@ -36,13 +38,13 @@ class Judge0ClientTest {
     @Test
     void submitsConstrainedCodeAndPollsWithoutExpectedOutputOrCallback() {
         var client =
-                new Judge0Client(
-                        RestClient.builder()
-                                .baseUrl("http://127.0.0.1:" + server.getAddress().getPort())
-                                .requestFactory(new JdkClientHttpRequestFactory())
-                                .build(),
-                        71,
-                        1);
+                new SandboxWorkerConfiguration()
+                        .sandboxClient(
+                                "http://127.0.0.1:" + server.getAddress().getPort(),
+                                71,
+                                "",
+                                1,
+                                5000);
         var result =
                 client.execute(
                         new SandboxRequest(
@@ -61,7 +63,13 @@ class Judge0ClientTest {
                 .contains("\"language_id\":71")
                 .contains("\"enable_network\":false")
                 .contains("\"cpu_time_limit\":1.500")
-                .doesNotContain("expected_output", "callback_url");
+                .doesNotContain(
+                        "expected_output",
+                        "callback_url",
+                        "enable_per_process_and_thread_time_limit",
+                        "enable_per_process_and_thread_memory_limit");
+        assertThat(contentLength.get()).isNotBlank().isNotEqualTo("0");
+        assertThat(transferEncoding.get()).isNull();
         assertThat(statusPolls.get()).isEqualTo(2);
         assertThat(result.stdout()).isEqualTo("5\n");
         assertThat(result.stdoutTruncated()).isTrue();
@@ -72,6 +80,8 @@ class Judge0ClientTest {
         if ("POST".equals(exchange.getRequestMethod())) {
             createBody.set(
                     new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            contentLength.set(exchange.getRequestHeaders().getFirst("Content-length"));
+            transferEncoding.set(exchange.getRequestHeaders().getFirst("Transfer-encoding"));
             body = "{\"token\":\"stub-token\"}";
         } else {
             int poll = statusPolls.incrementAndGet();
