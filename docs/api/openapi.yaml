@@ -2,16 +2,147 @@ openapi: 3.0.3
 info:
   title: CodeLearn API
   version: 0.1.0
-  description: Hợp đồng API cho danh mục khóa học, bài học và kiểm tra trạng thái dịch vụ.
+  description: Hợp đồng API cho tài khoản, danh mục khóa học, bài học và trạng thái dịch vụ.
 servers:
   - url: http://localhost:8080
     description: Backend cục bộ
 tags:
+  - name: Identity
+    description: Đăng ký email, đăng nhập và quản lý phiên hiện tại.
   - name: Content
     description: Khóa học và bài học đã xuất bản.
   - name: Health
     description: Trạng thái ứng dụng và kết nối cơ sở dữ liệu.
 paths:
+  /api/v1/auth/csrf:
+    get:
+      tags: [Identity]
+      operationId: getCsrfToken
+      summary: Lấy CSRF token cho phiên hiện tại
+      description: Giữ cookie phiên và gửi token trong header được trả về. Lấy lại token sau đăng ký, đăng nhập hoặc đăng xuất.
+      responses:
+        '200':
+          description: Token CSRF của phiên hiện tại. Nếu cần, tạo phiên ẩn danh.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Set-Cookie:
+              $ref: '#/components/headers/SessionCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CsrfToken'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/auth/register:
+    post:
+      tags: [Identity]
+      operationId: registerAccount
+      summary: Đăng ký tài khoản học viên bằng email
+      description: Đăng ký từ phiên ẩn danh và bắt đầu phiên đã xác thực. Email lưu dạng chữ thường.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterAccount'
+      responses:
+        '201':
+          description: Đã tạo học viên và đổi ID phiên.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Set-Cookie:
+              $ref: '#/components/headers/SessionCookie'
+            Location:
+              description: Đường dẫn hồ sơ của tài khoản trong phiên mới.
+              schema:
+                type: string
+                example: /api/v1/auth/me
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountView'
+        '400':
+          $ref: '#/components/responses/InvalidCredentialsBody'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '409':
+          $ref: '#/components/responses/EmailConflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/auth/login:
+    post:
+      tags: [Identity]
+      operationId: loginWithEmail
+      summary: Bắt đầu phiên đã xác thực bằng email và mật khẩu
+      description: Dùng phiên ẩn danh có CSRF token. Đọc GET /api/v1/auth/me để lấy hồ sơ sau đăng nhập.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '204':
+          description: Đăng nhập thành công và đổi ID phiên.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Set-Cookie:
+              $ref: '#/components/headers/SessionCookie'
+        '400':
+          $ref: '#/components/responses/InvalidCredentialsBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/auth/me:
+    get:
+      tags: [Identity]
+      operationId: getCurrentAccount
+      summary: Đọc hồ sơ của phiên hiện tại
+      security:
+        - SessionCookie: []
+      responses:
+        '200':
+          description: Hồ sơ tài khoản của phiên hiện tại.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountView'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/auth/logout:
+    post:
+      tags: [Identity]
+      operationId: logoutAccount
+      summary: Hủy phiên hiện tại
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      responses:
+        '204':
+          description: Phiên bị xóa khỏi PostgreSQL và cookie phiên hết hạn.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Set-Cookie:
+              $ref: '#/components/headers/SessionCookie'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/v1/health:
     get:
       tags: [Health]
@@ -140,7 +271,20 @@ paths:
         '503':
           $ref: '#/components/responses/ProbeUnavailable'
 components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: CODELEARN_SESSION
+      description: ID phiên do server cấp qua cookie HttpOnly.
   parameters:
+    CsrfHeader:
+      name: X-CSRF-TOKEN
+      in: header
+      required: true
+      description: CSRF token lấy từ GET /api/v1/auth/csrf, gửi cùng cookie phiên tương ứng.
+      schema:
+        type: string
     CourseSlug:
       name: courseSlug
       in: path
@@ -150,6 +294,10 @@ components:
         type: string
       example: python-co-ban
   headers:
+    SessionCookie:
+      description: Cookie CODELEARN_SESSION có HttpOnly, SameSite=Lax và Secure ngoài profile dev.
+      schema:
+        type: string
     RequestId:
       description: ID yêu cầu do backend tạo, trùng với traceId trong lỗi API.
       required: true
@@ -157,6 +305,42 @@ components:
         type: string
         format: uuid
   responses:
+    InvalidCredentialsBody:
+      description: Email hoặc mật khẩu không đạt validation. Mã lỗi là VALIDATION_ERROR.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    Unauthenticated:
+      description: Thiếu phiên hợp lệ hoặc thông tin đăng nhập sai. Mã lỗi là UNAUTHENTICATED.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    AuthForbidden:
+      description: Thiếu CSRF hợp lệ hoặc trạng thái xác thực hiện tại không cho phép thao tác. Mã lỗi là FORBIDDEN.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+    EmailConflict:
+      description: Email đã đăng ký, so sánh không phân biệt hoa thường. Mã lỗi là CONFLICT.
+      headers:
+        X-Request-Id:
+          $ref: '#/components/headers/RequestId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
     InvalidPagination:
       description: Tham số phân trang không hợp lệ. Mã lỗi là VALIDATION_ERROR.
       headers:
@@ -209,6 +393,50 @@ components:
           schema:
             $ref: '#/components/schemas/HealthStatus'
   schemas:
+    CsrfToken:
+      type: object
+      required: [headerName, token]
+      properties:
+        headerName:
+          type: string
+          example: X-CSRF-TOKEN
+        token:
+          type: string
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 128
+          writeOnly: true
+    RegisterAccount:
+      allOf:
+        - $ref: '#/components/schemas/LoginRequest'
+        - type: object
+          properties:
+            password:
+              type: string
+              minLength: 15
+    AccountView:
+      type: object
+      required: [id, email, role]
+      properties:
+        id:
+          type: integer
+          format: int64
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [LEARNER, AUTHOR, ADMIN]
     HealthStatus:
       type: object
       required: [status]

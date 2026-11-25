@@ -12,7 +12,7 @@ Cả nhóm chia nhau biên soạn nội dung và kiểm thử. Báo cáo giả �
 
 ## Điểm bắt đầu
 
-Bộ khung có Java 21, Spring Boot theo module nghiệp vụ, PostgreSQL, Flyway, health check, OpenAPI, kiểm thử và cấu hình CI. API công khai đọc dữ liệu mẫu khoá học và bài học để frontend tích hợp sớm. Việc tiếp theo là chốt hợp đồng cho đồ thị roadmap, thiết kế xác thực và quyền sở hữu, rồi nối các màn hình học bằng dữ liệu thật.
+Bộ khung có Java 21, Spring Boot theo module nghiệp vụ, PostgreSQL, Flyway, OpenAPI, kiểm thử và CI. Frontend có thể tích hợp API đọc khóa học, bài học và luồng tài khoản bằng email. Việc tiếp theo là chốt payload đồ thị roadmap và quyền sở hữu dữ liệu học tập, rồi nối các màn hình với dữ liệu thật. [OpenAPI](api/openapi.yaml) · [Tự rà soát](RELEASE_READINESS.md)
 
 ## Tuần 1–2 Khởi động và thiết kế
 
@@ -27,7 +27,8 @@ Bộ khung có Java 21, Spring Boot theo module nghiệp vụ, PostgreSQL, Flywa
 
 ## Tuần 3–6 Tài khoản và nội dung học
 
-- [ ] Làm đăng ký, đăng nhập email, băm mật khẩu, làm mới phiên và đăng xuất. Thêm quyền quản lý tài khoản và vai trò cho quản trị viên. Kiểm thử truy cập trái quyền, truy cập dữ liệu của người khác và thu hồi phiên. Nối Google và GitHub theo AC-01 sau khi luồng email ổn định.
+- [x] Làm đăng ký và đăng nhập email, băm mật khẩu, đổi ID phiên sau xác thực và thu hồi phiên khi đăng xuất.
+- [ ] Bổ sung hạn mức đăng nhập, xác minh email, khôi phục mật khẩu và quản lý tài khoản, vai trò. Kiểm thử quyền sở hữu khi có dữ liệu học tập. Nối Google và GitHub theo AC-01 sau khi luồng email ổn định.
 - [ ] Hoàn thiện API công khai cho danh mục, mục lục theo thứ tự, bài trước và bài sau. Thêm CMS cho khoá, bài học và blog. Tác giả tạo nháp và gửi duyệt, quản trị có thể yêu cầu sửa hoặc xuất bản. Lưu phiên bản nội dung khi xuất bản và kiểm thử việc truy cập bản nháp bằng URL trực tiếp.
 - [ ] Lưu tiến độ bài học theo tài khoản và cung cấp dữ liệu cho mục Tiếp tục học. Thống nhất cách render Markdown an toàn với frontend. Tích hợp Try it HTML, CSS và JavaScript qua iframe có sandbox ở frontend.
 - [ ] Chuẩn bị song song đề bài Python, mã khởi đầu, lời giải do tác giả viết, test công khai và test ẩn. Chốt mô hình dữ liệu và hợp đồng bài nộp để frontend dựng trạng thái chấm.

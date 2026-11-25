@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.RequestAttributes;
@@ -18,6 +19,11 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(ApiExceptionHandler.class);
+
+    @ExceptionHandler(BadCredentialsException.class)
+    ProblemDetail handleBadCredentials(BadCredentialsException exception, WebRequest request) {
+        return problem(HttpStatus.UNAUTHORIZED, request);
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
     ProblemDetail handleAccessDenied(AccessDeniedException exception, WebRequest request) {
@@ -32,24 +38,34 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
     @Override
     protected ResponseEntity<Object> handleExceptionInternal(
-            Exception exception, Object body, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
+            Exception exception,
+            Object body,
+            HttpHeaders headers,
+            HttpStatusCode status,
+            WebRequest request) {
         if (status.is5xxServerError()) {
             LOG.error("Unhandled API error", exception);
         }
-        return super.handleExceptionInternal(exception, problem(status, request), headers, status, request);
+        return super.handleExceptionInternal(
+                exception, problem(status, request), headers, status, request);
     }
 
     private ProblemDetail problem(HttpStatusCode status, WebRequest request) {
         ProblemDetail problem = ProblemDetail.forStatus(status);
-        String code = switch (status.value()) {
-            case 400 -> "VALIDATION_ERROR";
-            case 403 -> "FORBIDDEN";
-            case 404 -> "NOT_FOUND";
-            case 500 -> "INTERNAL_ERROR";
-            default -> "HTTP_" + status.value();
-        };
+        String code =
+                switch (status.value()) {
+                    case 400 -> "VALIDATION_ERROR";
+                    case 401 -> "UNAUTHENTICATED";
+                    case 403 -> "FORBIDDEN";
+                    case 404 -> "NOT_FOUND";
+                    case 409 -> "CONFLICT";
+                    case 500 -> "INTERNAL_ERROR";
+                    default -> "HTTP_" + status.value();
+                };
         problem.setProperty("code", code);
-        problem.setProperty("traceId", request.getAttribute(RequestIdFilter.ATTRIBUTE, RequestAttributes.SCOPE_REQUEST));
+        problem.setProperty(
+                "traceId",
+                request.getAttribute(RequestIdFilter.ATTRIBUTE, RequestAttributes.SCOPE_REQUEST));
         return problem;
     }
 }
