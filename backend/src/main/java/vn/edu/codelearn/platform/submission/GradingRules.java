@@ -41,11 +41,25 @@ final class GradingRules {
 
     static String normalize(String output) {
         String normalized = output.replace("\r\n", "\n").replace('\r', '\n');
-        normalized = normalized.replaceAll("[ \\t]+(?=\\n|$)", "");
-        while (normalized.endsWith("\n")) {
-            normalized = normalized.substring(0, normalized.length() - 1);
+        var trimmed = new StringBuilder(normalized.length());
+        int contentEnd = 0;
+        for (int index = 0; index < normalized.length(); index++) {
+            char character = normalized.charAt(index);
+            if (character == '\n') {
+                trimmed.setLength(contentEnd);
+                trimmed.append('\n');
+                contentEnd = trimmed.length();
+            } else {
+                trimmed.append(character);
+                if (character != ' ' && character != '\t') {
+                    contentEnd = trimmed.length();
+                }
+            }
         }
-        return normalized;
+        while (contentEnd > 0 && trimmed.charAt(contentEnd - 1) == '\n') {
+            contentEnd--;
+        }
+        return trimmed.substring(0, contentEnd);
     }
 
     static SubmissionViews.GradeResult aggregate(

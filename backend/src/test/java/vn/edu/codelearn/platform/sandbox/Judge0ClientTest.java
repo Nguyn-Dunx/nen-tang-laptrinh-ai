@@ -1,6 +1,7 @@
 package vn.edu.codelearn.platform.sandbox;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
@@ -18,6 +19,8 @@ class Judge0ClientTest {
     private AtomicReference<String> contentLength;
     private AtomicInteger statusPolls;
     private AtomicReference<String> transferEncoding;
+    private volatile String resultOverride;
+    private volatile boolean chunked;
 
     @BeforeEach
     void startStub() throws Exception {
@@ -75,6 +78,40 @@ class Judge0ClientTest {
         assertThat(result.stdoutTruncated()).isTrue();
     }
 
+    @Test
+    void rejectsAnOversizedChunkedResponseBeforeDecoding() {
+        chunked = true;
+        resultOverride = "{\"status\":{\"id\":3},\"stderr\":\"" + "d".repeat(20000) + "\"}";
+
+        assertThatThrownBy(this::executeSmallOutputRequest)
+                .isInstanceOf(SandboxExecutionException.class)
+                .hasMessage("Judge0 response exceeded the byte limit.");
+    }
+
+    @Test
+    void truncatesOutputAndDiagnosticsOnUtf8Boundaries() {
+        resultOverride = "{\"status\":{\"id\":3},\"stdout\":\"Aé\",\"stderr\":\"éA\"}";
+
+        var result = executeSmallOutputRequest();
+
+        assertThat(result.stdout()).isEqualTo("A");
+        assertThat(result.stderr()).isEqualTo("é");
+        assertThat(result.stdoutTruncated()).isTrue();
+    }
+
+    private SandboxResult executeSmallOutputRequest() {
+        var client =
+                new SandboxWorkerConfiguration()
+                        .sandboxClient(
+                                "http://127.0.0.1:" + server.getAddress().getPort(),
+                                71,
+                                "",
+                                1,
+                                5000);
+        return client.execute(
+                new SandboxRequest("print(1)", "", 1000, 3000, 200, 65536, 20, 1024, 2, 5));
+    }
+
     private void handle(com.sun.net.httpserver.HttpExchange exchange) throws java.io.IOException {
         String body;
         if ("POST".equals(exchange.getRequestMethod())) {
@@ -86,14 +123,16 @@ class Judge0ClientTest {
         } else {
             int poll = statusPolls.incrementAndGet();
             body =
-                    poll < 2
-                            ? "{\"status\":{\"id\":1}}"
-                            : "{\"status\":{\"id\":3},\"stdout\":\"5\\nextra\",\"stderr\":\"\","
-                                    + "\"time\":0.01,\"memory\":1024.0}";
+                    resultOverride != null
+                            ? resultOverride
+                            : poll < 2
+                                    ? "{\"status\":{\"id\":1}}"
+                                    : "{\"status\":{\"id\":3},\"stdout\":\"5\\nextra\",\"stderr\":\"\","
+                                            + "\"time\":0.01,\"memory\":1024.0}";
         }
         byte[] response = body.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().add("Content-Type", "application/json");
-        exchange.sendResponseHeaders(200, response.length);
+        exchange.sendResponseHeaders(200, chunked ? 0 : response.length);
         try (var output = exchange.getResponseBody()) {
             output.write(response);
         }

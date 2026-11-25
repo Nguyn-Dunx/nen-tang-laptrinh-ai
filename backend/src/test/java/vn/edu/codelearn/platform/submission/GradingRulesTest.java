@@ -15,6 +15,7 @@ class GradingRulesTest {
         assertThat(GradingRules.normalize("5 \t\r\n")).isEqualTo("5");
         assertThat(GradingRules.normalize(" 5\n")).isEqualTo(" 5");
         assertThat(GradingRules.normalize("a  b\n")).isEqualTo("a  b");
+        assertThat(GradingRules.normalize("a \r\n \t\n b\t\r")).isEqualTo("a\n\n b");
     }
 
     @Test

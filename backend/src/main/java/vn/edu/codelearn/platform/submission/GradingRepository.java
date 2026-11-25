@@ -37,6 +37,7 @@ class GradingRepository {
                                 """
                         UPDATE submission
                         SET status = 'RUNNING', attempt_count = attempt_count + 1,
+                            lease_expires_at = NULL,
                             status_updated_at = CURRENT_TIMESTAMP
                         WHERE id = :id AND status = 'QUEUED'
                           AND (retry_after IS NULL OR retry_after <= CURRENT_TIMESTAMP)
@@ -44,6 +45,20 @@ class GradingRepository {
                         .param("id", submissionId)
                         .update();
         return updated == 1 ? findWorkerSubmission(submissionId) : Optional.empty();
+    }
+
+    boolean extendLease(SubmissionViews.WorkerSubmission submission, long seconds) {
+        return jdbc.sql(
+                                """
+                UPDATE submission
+                SET lease_expires_at = CURRENT_TIMESTAMP + make_interval(secs => :seconds)
+                WHERE id = :id AND status = 'RUNNING' AND attempt_count = :attempt
+                """)
+                        .param("id", submission.id())
+                        .param("attempt", submission.attempt())
+                        .param("seconds", seconds)
+                        .update()
+                == 1;
     }
 
     List<SubmissionViews.WorkerTestCase> findTestCases(long exerciseId) {
@@ -77,7 +92,8 @@ class GradingRepository {
                         SET status = 'DONE', verdict = :verdict, score = :score,
                             time_ms = :timeMs, memory_kb = :memoryKb,
                             error_message = :errorMessage, finished_at = CURRENT_TIMESTAMP,
-                            status_updated_at = CURRENT_TIMESTAMP, retry_after = NULL
+                            status_updated_at = CURRENT_TIMESTAMP, retry_after = NULL,
+                            lease_expires_at = NULL
                         WHERE id = :id AND status = 'RUNNING' AND attempt_count = :attempt
                         """)
                         .param("verdict", grade.verdict())
@@ -104,6 +120,7 @@ class GradingRepository {
                                 """
                         UPDATE submission
                         SET status = :status, status_updated_at = CURRENT_TIMESTAMP,
+                            lease_expires_at = NULL,
                             retry_after = CASE WHEN :status = 'QUEUED'
                                 THEN CURRENT_TIMESTAMP + make_interval(secs => :delay)
                                 ELSE NULL END,
@@ -128,7 +145,9 @@ class GradingRepository {
                 SELECT id, status, attempt_count, status_updated_at
                 FROM submission
                 WHERE status IN ('QUEUED', 'RUNNING')
-                  AND status_updated_at < CURRENT_TIMESTAMP - make_interval(secs => :threshold)
+                  AND COALESCE(lease_expires_at,
+                      status_updated_at + make_interval(secs => :threshold)) < CURRENT_TIMESTAMP
+                  AND (status = 'RUNNING' OR retry_after IS NULL OR retry_after <= CURRENT_TIMESTAMP)
                 ORDER BY status_updated_at
                 LIMIT :batchSize
                 """)
@@ -146,13 +165,17 @@ class GradingRepository {
 
     @Transactional
     boolean recoverStuck(
-            SubmissionViews.StuckSubmission stuck, long maxAttempts, long retryDelaySeconds) {
+            SubmissionViews.StuckSubmission stuck,
+            long thresholdSeconds,
+            long maxAttempts,
+            long retryDelaySeconds) {
         String status = stuck.attempt() >= maxAttempts ? "FAILED" : "QUEUED";
         int updated =
                 jdbc.sql(
                                 """
                         UPDATE submission
                         SET status = :nextStatus, status_updated_at = CURRENT_TIMESTAMP,
+                            lease_expires_at = NULL,
                             retry_after = CASE WHEN :nextStatus = 'QUEUED'
                                 THEN CURRENT_TIMESTAMP + make_interval(secs => :delay)
                                 ELSE NULL END,
@@ -163,12 +186,18 @@ class GradingRepository {
                             verdict = NULL, score = NULL, time_ms = NULL, memory_kb = NULL
                         WHERE id = :id AND status = :currentStatus
                           AND status_updated_at = :statusUpdatedAt
+                          AND attempt_count = :attempt
+                          AND COALESCE(lease_expires_at,
+                              status_updated_at + make_interval(secs => :threshold)) < CURRENT_TIMESTAMP
+                          AND (status = 'RUNNING' OR retry_after IS NULL OR retry_after <= CURRENT_TIMESTAMP)
                         """)
                         .param("nextStatus", status)
                         .param("delay", retryDelaySeconds)
                         .param("id", stuck.id())
                         .param("currentStatus", stuck.status())
                         .param("statusUpdatedAt", stuck.statusUpdatedAt())
+                        .param("attempt", stuck.attempt())
+                        .param("threshold", thresholdSeconds)
                         .update();
         return updated == 1 && status.equals("QUEUED");
     }

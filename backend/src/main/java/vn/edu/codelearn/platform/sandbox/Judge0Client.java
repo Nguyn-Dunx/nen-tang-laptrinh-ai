@@ -1,15 +1,24 @@
 package vn.edu.codelearn.platform.sandbox;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 
 final class Judge0Client implements SandboxClient {
+
+    private static final JsonMapper JSON =
+            JsonMapper.builder().disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES).build();
+    private static final int MAX_TOKEN_RESPONSE_BYTES = 4096;
+    private static final int MAX_RESULT_RESPONSE_BYTES = 2 * 1024 * 1024;
 
     private final RestClient restClient;
     private final int pythonLanguageId;
@@ -24,11 +33,12 @@ final class Judge0Client implements SandboxClient {
     @Override
     public SandboxResult execute(SandboxRequest request) {
         String token = createSubmission(request);
+        int responseLimit = resultResponseLimit(request.maxOutputBytes());
         long deadline =
                 System.nanoTime()
                         + java.time.Duration.ofSeconds(request.pollTimeoutSeconds()).toNanos();
         while (System.nanoTime() < deadline) {
-            Judge0Response response = readSubmission(token);
+            Judge0Response response = readSubmission(token, responseLimit);
             if (response.status() == null || response.status().id() == null) {
                 throw new SandboxExecutionException("Judge0 returned an invalid status.");
             }
@@ -54,15 +64,21 @@ final class Judge0Client implements SandboxClient {
         payload.put("max_file_size", request.maxFileSizeKb());
         payload.put("enable_network", false);
         payload.put("number_of_runs", 1);
+        byte[] body = JSON.writeValueAsBytes(payload);
         try {
             var response =
                     restClient
                             .post()
                             .uri("/submissions?base64_encoded=false&wait=false")
                             .contentType(MediaType.APPLICATION_JSON)
-                            .body(payload)
-                            .retrieve()
-                            .body(Judge0CreateResponse.class);
+                            .contentLength(body.length)
+                            .body(body)
+                            .exchange(
+                                    (sent, received) ->
+                                            readJson(
+                                                    received,
+                                                    MAX_TOKEN_RESPONSE_BYTES,
+                                                    Judge0CreateResponse.class));
             if (response == null || response.token() == null || response.token().isBlank()) {
                 throw new SandboxExecutionException("Judge0 returned no submission token.");
             }
@@ -72,14 +88,19 @@ final class Judge0Client implements SandboxClient {
         }
     }
 
-    private Judge0Response readSubmission(String token) {
+    private Judge0Response readSubmission(String token, int responseLimit) {
         try {
             var response =
                     restClient
                             .get()
-                            .uri("/submissions/{token}?base64_encoded=false", token)
-                            .retrieve()
-                            .body(Judge0Response.class);
+                            .uri(
+                                    "/submissions/{token}?base64_encoded=false"
+                                            + "&fields=status,stdout,stderr,compile_output,time,memory",
+                                    token)
+                            .exchange(
+                                    (sent, received) ->
+                                            readJson(
+                                                    received, responseLimit, Judge0Response.class));
             if (response == null) {
                 throw new SandboxExecutionException("Judge0 returned an empty response.");
             }
@@ -89,27 +110,57 @@ final class Judge0Client implements SandboxClient {
         }
     }
 
+    private <T> T readJson(ClientHttpResponse response, int limit, Class<T> type)
+            throws IOException {
+        // Close the stream here so the request factory does not drain a rejected body.
+        try (var input = response.getBody()) {
+            if (!response.getStatusCode().is2xxSuccessful()) {
+                throw new SandboxExecutionException("Judge0 returned an unsuccessful response.");
+            }
+            if (response.getHeaders().getContentLength() > limit) {
+                throw new SandboxExecutionException("Judge0 response exceeded the byte limit.");
+            }
+            byte[] body = input.readNBytes(limit + 1);
+            if (body.length > limit) {
+                throw new SandboxExecutionException("Judge0 response exceeded the byte limit.");
+            }
+            return JSON.readValue(body, type);
+        } catch (JacksonException exception) {
+            throw new SandboxExecutionException("Judge0 returned invalid JSON.");
+        }
+    }
+
+    private int resultResponseLimit(long maxOutputBytes) {
+        // Three text fields can each need up to six JSON bytes per output byte.
+        long textBudget = 18 * Math.min(maxOutputBytes, MAX_RESULT_RESPONSE_BYTES);
+        return (int) Math.min(MAX_RESULT_RESPONSE_BYTES, 16384 + textBudget);
+    }
+
     private SandboxResult result(int statusId, Judge0Response response, long maxOutputBytes) {
         String stdout = response.stdout() == null ? "" : response.stdout();
-        byte[] bytes = stdout.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length <= maxOutputBytes) {
-            return new SandboxResult(
-                    statusId,
-                    stdout,
-                    diagnostic(response),
-                    response.time(),
-                    response.memory(),
-                    false);
-        }
-        int limit = Math.toIntExact(Math.min(maxOutputBytes, Integer.MAX_VALUE));
-        String truncated = new String(Arrays.copyOf(bytes, limit), StandardCharsets.UTF_8);
+        String boundedOutput = truncUtf8(stdout, maxOutputBytes);
         return new SandboxResult(
                 statusId,
-                truncated,
-                diagnostic(response),
+                boundedOutput,
+                truncUtf8(diagnostic(response), maxOutputBytes),
                 response.time(),
                 response.memory(),
-                true);
+                !boundedOutput.equals(stdout));
+    }
+
+    private String truncUtf8(String text, long limit) {
+        if (text == null) {
+            return null;
+        }
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length <= limit) {
+            return text;
+        }
+        int end = Math.toIntExact(limit);
+        while (end > 0 && (bytes[end] & 0xC0) == 0x80) {
+            end--;
+        }
+        return new String(bytes, 0, end, StandardCharsets.UTF_8);
     }
 
     private String diagnostic(Judge0Response response) {

@@ -51,7 +51,7 @@ class SubmissionWorker {
         long retryDelay = limits.get("retry_backoff_seconds");
         int batchSize = Math.toIntExact(limits.get("recovery_batch_size"));
         for (var stuck : grading.findStuck(threshold, batchSize)) {
-            if (grading.recoverStuck(stuck, maxAttempts, retryDelay)) {
+            if (grading.recoverStuck(stuck, threshold, maxAttempts, retryDelay)) {
                 enqueueForRecovery(stuck.id());
             }
         }
