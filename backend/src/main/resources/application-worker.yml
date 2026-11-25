@@ -1,0 +1,19 @@
+spring:
+  flyway:
+    enabled: false
+
+server:
+  port: -1
+
+sandbox:
+  worker:
+    poll-interval-ms: ${SANDBOX_WORKER_POLL_INTERVAL_MS:500}
+    recovery-interval-ms: ${SANDBOX_WORKER_RECOVERY_INTERVAL_MS:5000}
+  judge0:
+    poll-interval-ms: ${JUDGE0_POLL_INTERVAL_MS:250}
+    http-timeout-ms: ${JUDGE0_HTTP_TIMEOUT_MS:5000}
+
+judge0:
+  base-url: ${JUDGE0_BASE_URL}
+  python-language-id: ${JUDGE0_PYTHON_LANGUAGE_ID}
+  auth-token: ${JUDGE0_AUTH_TOKEN:}

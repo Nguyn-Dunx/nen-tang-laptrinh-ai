@@ -45,6 +45,8 @@ erDiagram
 
 `account.email` được chuẩn hóa về chữ thường trước khi ghi. Spring Session dùng `principal_name` để tra phiên của tài khoản, và trường này để trống với phiên ẩn danh. Flyway quản lý cả bảng phiên và bảng tài khoản. [Migration V2](../backend/src/main/resources/db/migration/V2__create_identity.sql)
 
+Sandbox nối `exercise.lesson_id` với `lesson`. PostgreSQL giữ bài nộp và verdict. Worker dùng `attempt_count` và `lease_expires_at` để kiểm soát recovery. V7 cấp mặc định mà giữ các giá trị đã cấu hình, V8 bổ sung lease. [Mô hình dữ liệu Sandbox](sandbox/DATA-MODEL.md) · [ADR worker](adr/0002-sandbox-worker-and-queue.md)
+
 - Tên bảng/cột dùng `snake_case`. Đặt khóa chính `id`, khóa ngoại `<table>_id` và cột thời điểm `timestamptz` để việc join và xử lý timezone nhất quán.
 - Tạo migration `V<n>__<verb>_<noun>.sql` theo version kế tiếp. Giữ checksum của migration đã áp dụng. Chạy Flyway trên DB trống và DB ở version trước để kiểm tra cài mới lẫn nâng cấp.
 - Repository bind tất cả giá trị, chọn cột cần đọc, có `ORDER BY` ổn định khi phân trang. Với index mới, ghi truy vấn đích và kiểm tra kế hoạch bằng `EXPLAIN` trên dữ liệu đại diện.

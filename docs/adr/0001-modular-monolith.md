@@ -7,6 +7,8 @@
 
 **Trạng thái** Accepted · **Ngày quyết định** 2026-11-25
 
+Phần bố trí API, worker và hàng đợi được cập nhật ở [ADR 0002](0002-sandbox-worker-and-queue.md).
+
 ## Bối cảnh
 
 Nhóm có ba người. Repo đã có một ứng dụng Spring Boot và catalog PostgreSQL. Luồng MVP cần thêm tài khoản, tiến độ, chấm bài bất đồng bộ và trợ lý AI.

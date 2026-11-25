@@ -12,7 +12,7 @@ Cả nhóm chia nhau biên soạn nội dung và kiểm thử. Báo cáo giả �
 
 ## Điểm bắt đầu
 
-Bộ khung có Java 21, Spring Boot theo module nghiệp vụ, PostgreSQL, Flyway, OpenAPI, kiểm thử và CI. Frontend có thể tích hợp API đọc khóa học, bài học và luồng tài khoản bằng email. Việc tiếp theo là chốt payload đồ thị roadmap và quyền sở hữu dữ liệu học tập, rồi nối các màn hình với dữ liệu thật. [OpenAPI](api/openapi.yaml) · [Tự rà soát](RELEASE_READINESS.md)
+Bộ khung có catalog, tài khoản và API nộp bài Python. Worker và Judge0 adapter đã có luồng kiểm thử với stub. Mốc tiếp theo là hoàn thiện biên tập, xuất bản Khóa học và nối bài học với Sandbox. Roadmap bên dưới mô tả phạm vi 16 tuần của toàn hệ thống. [Kế hoạch Khóa học 6 tuần](COURSE_MODULE_PLAN.md) · [Hiện trạng](PROJECT_STATUS.md) · [OpenAPI](api/openapi.yaml)
 
 ## Tuần 1–2 Khởi động và thiết kế
 

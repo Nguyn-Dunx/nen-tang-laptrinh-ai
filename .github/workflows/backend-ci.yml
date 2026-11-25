@@ -43,10 +43,23 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - '6379:6379'
+        options: >-
+          --health-cmd "redis-cli -a codelearn_test_password ping | grep -q PONG"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+        command: redis-server --requirepass codelearn_test_password
     env:
       TEST_DB_URL: jdbc:postgresql://localhost:5432/codelearn_test
       TEST_DB_USER: codelearn
       TEST_DB_PASSWORD: codelearn_test_password
+      REDIS_HOST: localhost
+      REDIS_PORT: '6379'
+      REDIS_PASSWORD: codelearn_test_password
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5

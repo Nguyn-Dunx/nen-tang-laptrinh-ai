@@ -12,14 +12,18 @@ flowchart LR
     Client["Trình duyệt"] -->|"HTTPS"| Proxy["Reverse proxy chung origin"]
     subgraph Host["Máy ứng dụng"]
         Proxy --> Web["Frontend"]
-        Proxy --> App["Spring Boot API và worker"]
+        Proxy --> App["Spring Boot API"]
+        Worker["Spring Boot worker"]
         App --> PG[("PostgreSQL riêng theo môi trường")]
+        App --> Redis[("Redis")]
+        Redis --> Worker
+        Worker --> PG
     end
-    App -->|"Mạng riêng"| Judge["Judge0 trên máy hoặc VM riêng"]
-    App -->|"HTTPS"| LLM["Nhà cung cấp LLM"]
+    Worker -->|"Mạng riêng"| Judge["Judge0 trên máy hoặc VM riêng"]
 ```
 
 - Mỗi môi trường có DB và secret riêng. Dùng cấu hình ngoài profile `dev` để seed mẫu chỉ xuất hiện ở local/test.
+- Khởi động API để Flyway áp migration và cấp cấu hình Sandbox, sau đó khởi động cùng image với profile `worker`. Smoke test bài đã xuất bản, kết nối Redis và vòng đời một bài nộp trên staging. [ADR worker](adr/0002-sandbox-worker-and-queue.md) · [Cấu hình local](ENVIRONMENT_SETUP.md)
 - Trước release, ghi digest cũ và mới, sao lưu khi có migration, thử migration trên staging và kiểm tra khả năng chạy mã cũ với schema mới. Sau release, kiểm tra readiness, API bài học và SSE qua proxy khi đã bật.
 - Nếu smoke lỗi, dừng rollout. Quay lại digest cũ khi schema tương thích. Nếu schema không tương thích, chọn bản sửa tiến hoặc khôi phục backup sau khi xác nhận nguy cơ mất dữ liệu với người phụ trách. Diễn tập restore trước bàn giao.
 - Bật nộp mã thật khi môi trường Judge0 riêng đã xác minh quyền kết nối, cô lập mỗi lần chạy và giới hạn tài nguyên. Bật cảnh báo sau khi cấu hình ngưỡng và nơi nhận. [Bảo mật](AUTH_SECURITY.md) · [Observability](OBSERVABILITY.md)

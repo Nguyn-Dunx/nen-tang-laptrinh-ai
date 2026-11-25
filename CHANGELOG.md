@@ -12,6 +12,12 @@
 - Bộ tài liệu kiến trúc, phát triển và vận hành cho backend.
 - Đăng ký và đăng nhập bằng email, xem hồ sơ và đăng xuất bằng phiên lưu trong PostgreSQL.
 - Cấu hình format, lint, kiểm tra Conventional Commit và đóng gói backend bằng Docker.
+- Sandbox Python gồm API bài tập, nộp bài, polling, lịch sử, Redis và worker Judge0.
+
+### Fixed
+
+- Flyway cấp mặc định Sandbox ngoài profile dev và giữ cấu hình đã tùy chỉnh.
+- Worker giới hạn body Judge0 trước khi giải mã, và gia hạn lease theo từng test case để tránh recovery nhầm.
 
 ## Quy ước ghi mục
 

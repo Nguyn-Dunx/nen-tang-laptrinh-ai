@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: CodeLearn API
   version: 0.1.0
-  description: Hợp đồng API cho tài khoản, danh mục khóa học, bài học và trạng thái dịch vụ.
+  description: Hợp đồng API cho tài khoản, danh mục khóa học, bài học, bài tập đã xuất bản và trạng thái dịch vụ.
 servers:
   - url: http://localhost:8080
     description: Backend cục bộ
@@ -11,6 +11,8 @@ tags:
     description: Đăng ký email, đăng nhập và quản lý phiên hiện tại.
   - name: Content
     description: Khóa học và bài học đã xuất bản.
+  - name: Sandbox
+    description: Bài tập lập trình đã xuất bản và test công khai.
   - name: Health
     description: Trạng thái ứng dụng và kết nối cơ sở dữ liệu.
 paths:
@@ -249,6 +251,212 @@ paths:
           $ref: '#/components/responses/ContentNotFound'
         '500':
           $ref: '#/components/responses/InternalError'
+  /api/v1/exercises/{exerciseId}:
+    get:
+      tags: [Sandbox]
+      operationId: getExercise
+      summary: Lấy bài tập đã xuất bản cùng test công khai
+      description: Bài thuộc lesson hoặc course chưa xuất bản trả về 404. Test ẩn và lời giải tham khảo không được đưa vào response.
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          description: ID bài tập.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Bài tập cùng các test công khai theo thứ tự chạy.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExerciseView'
+        '404':
+          description: Bài tập không tồn tại hoặc lesson/course chưa xuất bản. Mã lỗi là EXERCISE_NOT_FOUND.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/v1/exercises/{exerciseId}/submissions:
+    post:
+      tags: [Sandbox]
+      operationId: createSubmission
+      summary: Nộp mã Python để chấm
+      description: Lưu mã và trả ngay ID. Worker riêng thực thi qua Judge0; cần session đăng nhập và CSRF token.
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubmission'
+      responses:
+        '202':
+          description: Bài nộp đã được lưu để xử lý.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+            Location:
+              description: Đường dẫn để polling trạng thái bài nộp.
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionReceipt'
+        '400':
+          $ref: '#/components/responses/InvalidCredentialsBody'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/AuthForbidden'
+        '404':
+          $ref: '#/components/responses/ContentNotFound'
+        '413':
+          description: Mã nguồn lớn hơn giới hạn cấu hình.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '429':
+          description: Đã vượt giới hạn tần suất hoặc số bài đang chờ.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '503':
+          description: Grader chưa sẵn sàng nhận bài.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+    get:
+      tags: [Sandbox]
+      operationId: listExerciseSubmissions
+      summary: Liệt kê lịch sử nộp của người dùng hiện tại
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: exerciseId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Trang lịch sử, không chứa mã nguồn hoặc dữ liệu test.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionPage'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/ContentNotFound'
+  /api/v1/submissions/{submissionId}:
+    get:
+      tags: [Sandbox]
+      operationId: getSubmission
+      summary: Đọc trạng thái và kết quả chấm
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Trạng thái và kết quả của chủ bài nộp. Test ẩn không có input/output.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionView'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          description: Bài nộp không tồn tại hoặc không thuộc người dùng hiện tại.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+  /api/v1/submissions/{submissionId}/detail:
+    get:
+      tags: [Sandbox]
+      operationId: getSubmissionDetail
+      summary: Đọc lại mã nguồn của chính bài nộp
+      security:
+        - SessionCookie: []
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: Chi tiết bài nộp của chủ sở hữu.
+          headers:
+            X-Request-Id:
+              $ref: '#/components/headers/RequestId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionDetail'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          description: Bài nộp không tồn tại hoặc không thuộc người dùng hiện tại.
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
   /actuator/health/liveness:
     get:
       tags: [Health]
@@ -545,3 +753,190 @@ components:
             bodyMarkdown:
               type: string
               description: Mã nguồn Markdown của bài học.
+    ExerciseView:
+      type: object
+      required: [id, lessonId, title, language, difficulty, statementMarkdown, starterCode, maxScore, publicTests]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        lessonId:
+          type: integer
+          format: int64
+        title:
+          type: string
+          example: Tính tổng hai số
+        language:
+          type: string
+          example: python
+        difficulty:
+          type: string
+          example: beginner
+        statementMarkdown:
+          type: string
+          description: Đề bài dạng Markdown.
+        starterCode:
+          type: string
+        maxScore:
+          type: integer
+          minimum: 1
+          example: 100
+        publicTests:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicTestCase'
+    PublicTestCase:
+      type: object
+      required: [position, stdin, expectedOutput]
+      properties:
+        position:
+          type: integer
+          format: int32
+          minimum: 1
+        stdin:
+          type: string
+        expectedOutput:
+          type: string
+    CreateSubmission:
+      type: object
+      required: [language, source_code]
+      additionalProperties: false
+      properties:
+        language:
+          type: string
+          enum: [python]
+        source_code:
+          type: string
+          minLength: 1
+    SubmissionReceipt:
+      type: object
+      required: [submission_id, status, verdict, created_at]
+      properties:
+        submission_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [QUEUED]
+        verdict:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    SubmissionView:
+      type: object
+      required: [submission_id, exercise_id, status, verdict, score, max_score, created_at, tests]
+      properties:
+        submission_id:
+          type: integer
+          format: int64
+        exercise_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, DONE, FAILED]
+        verdict:
+          type: string
+          nullable: true
+          enum: [ACCEPTED, WRONG_ANSWER, TIME_LIMIT, MEMORY_LIMIT, RUNTIME_ERROR, COMPILE_ERROR]
+        score:
+          type: number
+          nullable: true
+        max_score:
+          type: integer
+        time_ms:
+          type: integer
+          nullable: true
+        memory_kb:
+          type: integer
+          nullable: true
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        tests:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionTestResult'
+    SubmissionTestResult:
+      type: object
+      required: [position, public, passed, verdict]
+      properties:
+        position:
+          type: integer
+        public:
+          type: boolean
+        passed:
+          type: boolean
+        verdict:
+          type: string
+          enum: [ACCEPTED, WRONG_ANSWER, TIME_LIMIT, MEMORY_LIMIT, RUNTIME_ERROR, COMPILE_ERROR]
+        time_ms:
+          type: integer
+          nullable: true
+        memory_kb:
+          type: integer
+          nullable: true
+        stdin:
+          type: string
+        expected_output:
+          type: string
+        actual_output:
+          type: string
+    SubmissionDetail:
+      allOf:
+        - $ref: '#/components/schemas/SubmissionView'
+        - type: object
+          required: [language, source_code]
+          properties:
+            language:
+              type: string
+            source_code:
+              type: string
+    SubmissionSummary:
+      type: object
+      required: [submission_id, status, verdict, score, created_at]
+      properties:
+        submission_id:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, DONE, FAILED]
+        verdict:
+          type: string
+          nullable: true
+          enum: [ACCEPTED, WRONG_ANSWER, TIME_LIMIT, MEMORY_LIMIT, RUNTIME_ERROR, COMPILE_ERROR]
+        score:
+          type: number
+          nullable: true
+        time_ms:
+          type: integer
+          nullable: true
+        memory_kb:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+    SubmissionPage:
+      type: object
+      required: [items, page, size]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionSummary'
+        page:
+          type: integer
+        size:
+          type: integer
