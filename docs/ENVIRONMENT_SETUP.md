@@ -33,10 +33,13 @@ Set-Location backend
 $env:TEST_DB_URL = 'jdbc:postgresql://127.0.0.1:5432/codelearn_test'
 $env:TEST_DB_USER = 'learn'
 $env:TEST_DB_PASSWORD = 'learn_dev_password'
+$env:REDIS_HOST = '127.0.0.1'
+$env:REDIS_PORT = '6379'
+$env:REDIS_PASSWORD = 'redis_dev_password'
 .\mvnw.cmd verify
 ```
 
-Trên macOS/Linux, export ba biến `TEST_DB_*` tương ứng rồi chạy `bash ./mvnw verify`. Nếu cổng DB bị chiếm, đổi `DB_PORT` và URL test. Nếu readiness lỗi, xem `docker compose --env-file .env -f infra/docker-compose.dev.yml ps` và log Flyway. Dừng API bằng `Ctrl+C`. Từ repo root, chạy `docker compose --env-file .env -f infra/docker-compose.dev.yml down` để giữ volume.
+Trên macOS/Linux, export các biến `TEST_DB_*` và `REDIS_*` tương ứng rồi chạy `bash ./mvnw verify`. Dùng PostgreSQL và Redis local dành cho phát triển. Nếu cổng DB bị chiếm, đổi `DB_PORT` và URL test. Nếu readiness lỗi, xem `docker compose --env-file .env -f infra/docker-compose.dev.yml ps` và log Flyway. Dừng API bằng `Ctrl+C`. Từ repo root, chạy `docker compose --env-file .env -f infra/docker-compose.dev.yml down` để giữ volume.
 
 ## Sandbox: nộp bài và worker
 
@@ -54,6 +57,31 @@ bash ./mvnw -Dspring-boot.run.profiles=worker spring-boot:run
 ```
 
 Submission API, quyền truy cập, mã lỗi và polling được mô tả trong [OpenAPI](api/openapi.yaml). SSE chưa được triển khai.
+
+### Thử nộp bài từ một bài học
+
+Chạy backend với profile `dev` và dùng terminal PowerShell khác. Thực hiện bước đăng ký hoặc đăng nhập để có `$accountSession` theo [hướng dẫn tài khoản](AUTH_SECURITY.md#thử-api-tài-khoản). Chạy các lệnh sau trong cùng terminal với phiên đó, trước bước đăng xuất.
+
+```powershell
+$api = 'http://127.0.0.1:8080/api/v1'
+$lessonUrl = "$api/courses/python-co-ban/lessons/dieu-kien"
+Invoke-RestMethod $lessonUrl | Select-Object title, previousLessonSlug, nextLessonSlug
+$exercises = Invoke-RestMethod "$lessonUrl/exercises"
+$exerciseId = $exercises[0].id
+Invoke-RestMethod "$api/exercises/$exerciseId"
+
+$csrf = Invoke-RestMethod "$api/auth/csrf" -WebSession $accountSession
+$submission = @{
+    language = 'python'
+    source_code = 'print("PASS" if int(input()) >= 5 else "RETRY")'
+} | ConvertTo-Json
+$receipt = Invoke-RestMethod "$api/exercises/$exerciseId/submissions" -Method Post `
+    -WebSession $accountSession -Headers @{'X-CSRF-TOKEN' = $csrf.token} `
+    -ContentType 'application/json' -Body $submission
+Invoke-RestMethod "$api/submissions/$($receipt.submission_id)" -WebSession $accountSession
+```
+
+Trên dữ liệu mẫu mới, bài `dieu-kien` có một bài tập với hai test công khai. API nộp bài trả `202` và `submission_id`. Nếu chỉ chạy API, trạng thái là `QUEUED`. Khi worker và Judge0 hoạt động, gọi lại lệnh cuối để xem `DONE`, `ACCEPTED` và điểm `100`. Luồng kiểm thử tự động dùng Judge0 stub để xác minh hành vi tích hợp.
 
 ## Chạy cả backend bằng Compose
 

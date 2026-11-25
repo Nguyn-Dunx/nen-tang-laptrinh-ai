@@ -62,13 +62,15 @@ class CatalogIntegrationTest {
     void should_list_ordered_published_lessons_and_serve_markdown() throws Exception {
         mvc.perform(get("/api/v1/courses/python-co-ban"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.lessons.length()").value(2))
+                .andExpect(jsonPath("$.lessons.length()").value(6))
                 .andExpect(jsonPath("$.lessons[0].slug").value("xin-chao-python"))
                 .andExpect(jsonPath("$.lessons[1].slug").value("bien-va-gia-tri"));
         mvc.perform(get("/api/v1/courses/python-co-ban/lessons/xin-chao-python"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.courseSlug").value("python-co-ban"))
-                .andExpect(jsonPath("$.bodyMarkdown").isNotEmpty());
+                .andExpect(jsonPath("$.bodyMarkdown").isNotEmpty())
+                .andExpect(jsonPath("$.previousLessonSlug").doesNotExist())
+                .andExpect(jsonPath("$.nextLessonSlug").value("bien-va-gia-tri"));
     }
 
     @Test
@@ -98,7 +100,7 @@ class CatalogIntegrationTest {
 
     @Test
     void should_deny_unlisted_routes_and_writes() throws Exception {
-        mvc.perform(get("/api/v1/admin/courses"))
+        mvc.perform(get("/api/v1/undefined"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         mvc.perform(post("/api/v1/courses"))

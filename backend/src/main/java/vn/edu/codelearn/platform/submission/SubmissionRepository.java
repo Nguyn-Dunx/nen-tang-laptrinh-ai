@@ -19,16 +19,26 @@ class SubmissionRepository {
                                 """
                 SELECT count(*)
                 FROM exercise
-                JOIN lesson ON lesson.id = exercise.lesson_id
-                JOIN course ON course.id = lesson.course_id
+                JOIN published_lesson lesson ON lesson.id = exercise.lesson_id
                 WHERE exercise.id = :exerciseId
-                  AND lesson.published_at IS NOT NULL
-                  AND course.published_at IS NOT NULL
                 """)
                         .param("exerciseId", exerciseId)
                         .query(Long.class)
                         .single()
                 > 0;
+    }
+
+    boolean hasHistory(long userId, long exerciseId) {
+        return jdbc.sql(
+                        """
+                SELECT EXISTS (
+                    SELECT 1 FROM submission WHERE user_id = :userId AND exercise_id = :exerciseId
+                )
+                """)
+                .param("userId", userId)
+                .param("exerciseId", exerciseId)
+                .query(Boolean.class)
+                .single();
     }
 
     int countPendingForUser(long userId) {

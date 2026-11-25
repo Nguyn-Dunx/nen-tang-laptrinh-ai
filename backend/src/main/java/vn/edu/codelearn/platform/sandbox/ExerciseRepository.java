@@ -34,15 +34,29 @@ class ExerciseRepository {
                        exercise.difficulty, exercise.statement_md, exercise.starter_code,
                        exercise.max_score
                 FROM exercise
-                JOIN lesson ON lesson.id = exercise.lesson_id
-                JOIN course ON course.id = lesson.course_id
+                JOIN published_lesson lesson ON lesson.id = exercise.lesson_id
                 WHERE exercise.id = :exerciseId
-                  AND lesson.published_at IS NOT NULL
-                  AND course.published_at IS NOT NULL
                 """)
                 .param("exerciseId", exerciseId)
                 .query(EXERCISE_ROW)
                 .optional();
+    }
+
+    List<ExerciseCatalog.ExerciseSummary> findForPublishedLesson(long lessonId) {
+        return jdbc.sql(
+                        """
+                SELECT exercise.id, exercise.title, exercise.language FROM exercise
+                JOIN published_lesson lesson ON lesson.id = exercise.lesson_id
+                WHERE lesson.id = :lessonId ORDER BY exercise.id
+                """)
+                .param("lessonId", lessonId)
+                .query(
+                        (row, index) ->
+                                new ExerciseCatalog.ExerciseSummary(
+                                        row.getLong("id"),
+                                        row.getString("title"),
+                                        row.getString("language")))
+                .list();
     }
 
     List<ExerciseViews.PublicTestCase> findPublicTestCases(long exerciseId) {

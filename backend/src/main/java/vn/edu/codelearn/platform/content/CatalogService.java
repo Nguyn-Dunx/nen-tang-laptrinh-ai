@@ -1,18 +1,22 @@
 package vn.edu.codelearn.platform.content;
 
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import vn.edu.codelearn.platform.sandbox.ExerciseCatalog;
 
 @Service
 class CatalogService {
 
     private final CatalogRepository catalog;
+    private final ExerciseCatalog exercises;
 
-    CatalogService(CatalogRepository catalog) {
+    CatalogService(CatalogRepository catalog, ExerciseCatalog exercises) {
         this.catalog = catalog;
+        this.exercises = exercises;
     }
 
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -40,5 +44,14 @@ class CatalogService {
     CatalogViews.LessonDetail getLesson(String courseSlug, String lessonSlug) {
         return catalog.findPublishedLesson(courseSlug, lessonSlug)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+    }
+
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    List<ExerciseCatalog.ExerciseSummary> listLessonExercises(
+            String courseSlug, String lessonSlug) {
+        long lessonId =
+                catalog.findPublishedLessonId(courseSlug, lessonSlug)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        return exercises.listForPublishedLesson(lessonId);
     }
 }

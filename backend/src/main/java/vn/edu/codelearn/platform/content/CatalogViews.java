@@ -15,5 +15,11 @@ final class CatalogViews {
     record LessonSummary(String slug, String title, int position) {}
 
     record LessonDetail(
-            String courseSlug, String slug, String title, int position, String bodyMarkdown) {}
+            String courseSlug,
+            String slug,
+            String title,
+            int position,
+            String bodyMarkdown,
+            String previousLessonSlug,
+            String nextLessonSlug) {}
 }

@@ -13,11 +13,14 @@
 - Đăng ký và đăng nhập bằng email, xem hồ sơ và đăng xuất bằng phiên lưu trong PostgreSQL.
 - Cấu hình format, lint, kiểm tra Conventional Commit và đóng gói backend bằng Docker.
 - Sandbox Python gồm API bài tập, nộp bài, polling, lịch sử, Redis và worker Judge0.
+- Quản trị viên có thể biên tập khóa và bài nháp, sắp xếp bài, xuất bản và thu hồi. Khóa Python mẫu có sáu bài và ba bài tập trong profile dev.
+- API bài học trả bài trước, bài sau và hỗ trợ tìm bài tập theo slug thông qua endpoint riêng.
 
 ### Fixed
 
 - Flyway cấp mặc định Sandbox ngoài profile dev và giữ cấu hình đã tùy chỉnh.
 - Worker giới hạn body Judge0 trước khi giải mã, và gia hạn lease theo từng test case để tránh recovery nhầm.
+- Profile `worker` tắt web server, tránh trùng cổng khi API và worker thừa hưởng cùng `SERVER_PORT`.
 
 ## Quy ước ghi mục
 

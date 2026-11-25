@@ -5,6 +5,8 @@
 
 # Kế hoạch triển khai module Khóa học
 
+Backend đã có API quản trị, xuất bản, điều hướng và tìm bài tập theo bài học. Dữ liệu mẫu đã đủ 6 bài và 3 bài tập. Kế hoạch tiếp tục theo dõi tích hợp frontend, duyệt nội dung và UAT. [API và quy trình quản trị](COURSE_MODULE.md)
+
 ## Đầu ra cuối tuần 6
 
 Một khóa Python cơ bản với **6–8 bài Markdown và ít nhất 3 bài tập** là mục tiêu đề xuất. Học viên mở khóa, đọc bài đã xuất bản, tìm bài tập từ bài học, đăng nhập, nộp mã và xem verdict bằng polling. Quản trị viên tạo, sửa và xuất bản nội dung trên staging. Dùng OpenAPI làm hợp đồng với frontend. [Hiện trạng](PROJECT_STATUS.md) · [OpenAPI](api/openapi.yaml)

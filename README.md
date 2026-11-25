@@ -5,7 +5,7 @@
 
 # Backend nền tảng học lập trình
 
-Nền tảng giúp người mới và sinh viên học theo roadmap, thực hành và hỏi AI theo ngữ cảnh. Backend hiện có catalog đọc, health và module mẫu `identity` với đăng ký email, đăng nhập, hồ sơ và đăng xuất. Profile `dev` có khóa **Python cơ bản** gồm hai bài mẫu. Stack gồm Java 21, Spring Boot, Maven Wrapper, PostgreSQL và Flyway.
+Nền tảng giúp người mới và sinh viên học theo roadmap, thực hành và hỏi AI theo ngữ cảnh. Backend hiện có quản trị Khóa học, tài khoản, health và Sandbox. Profile `dev` có khóa **Python cơ bản** gồm sáu bài mẫu và ba bài tập. Stack gồm Java 21, Spring Boot, PostgreSQL, Flyway và Redis.
 
 ## Chạy nhanh trên Windows
 
@@ -35,8 +35,8 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/courses/python-co-ban/lessons/xin
 - Chạy trên macOS/Linux, đổi cổng, dừng DB và chạy test với PostgreSQL. [Cài đặt local](docs/ENVIRONMENT_SETUP.md) · [Kiểm thử](docs/TESTING_STRATEGY.md)
 - Chạy cả backend và PostgreSQL bằng Docker Compose hoặc thử luồng tài khoản qua PowerShell. [Compose local](docs/ENVIRONMENT_SETUP.md#chạy-cả-backend-bằng-compose) · [Thử API tài khoản](docs/AUTH_SECURITY.md#thử-api-tài-khoản)
 - Tích hợp và thay đổi API. [Hướng dẫn API](docs/API.md) · [OpenAPI](docs/api/openapi.yaml) · [Quy ước API](docs/API_GUIDELINES.md)
-- Chạy và kiểm thử nộp bài/chấm sandbox. [Thiết lập local](docs/ENVIRONMENT_SETUP.md#sandbox-nộp-bài-và-worker) · [Trạng thái hiện tại](docs/PROJECT_STATUS.md) · [Đặc tả sandbox](docs/sandbox/)
-- Triển khai tiếp module Khóa học. [Kế hoạch Khóa học 6 tuần](docs/COURSE_MODULE_PLAN.md)
+- Chạy và kiểm thử nộp bài/chấm Sandbox. [Thử nộp bài từ một bài học](docs/ENVIRONMENT_SETUP.md#thử-nộp-bài-từ-một-bài-học) · [Trạng thái hiện tại](docs/PROJECT_STATUS.md) · [Đặc tả Sandbox](docs/sandbox/)
+- Dùng và kiểm tra module Khóa học. [API và quy trình quản trị](docs/COURSE_MODULE.md) · [Kế hoạch Khóa học 6 tuần](docs/COURSE_MODULE_PLAN.md)
 - Hiểu module, migration và mốc triển khai. [Kiến trúc](docs/ARCHITECTURE.md) · [Cấu trúc thư mục](docs/FOLDER_STRUCTURE.md) · [Dữ liệu](docs/DATABASE.md) · [Lộ trình](docs/ROADMAP.md)
 - Bắt đầu một thay đổi. [Onboarding](docs/ONBOARDING.md) · [Đóng góp](CONTRIBUTING.md) · [Hướng dẫn agent](AGENTS.md) · [Changelog](CHANGELOG.md)
 - Kiểm tra mức sẵn sàng của bộ khung. [Tự rà soát và rủi ro còn lại](docs/RELEASE_READINESS.md)

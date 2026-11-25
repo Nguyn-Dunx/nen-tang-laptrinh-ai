@@ -15,7 +15,8 @@ Thử thay câu chào bằng tên của bạn.
 $markdown$, CURRENT_TIMESTAMP
 FROM course
 WHERE slug = 'python-co-ban'
-ON CONFLICT DO NOTHING;
+  AND NOT EXISTS (SELECT 1 FROM lesson WHERE course_id = course.id AND position = 1)
+ON CONFLICT (course_id, slug) DO NOTHING;
 
 INSERT INTO lesson (course_id, slug, title, position, body_markdown, published_at)
 SELECT id, 'bien-va-gia-tri', 'Biến và giá trị', 2, $markdown$# Đặt tên cho giá trị
@@ -31,4 +32,5 @@ Thử gán giá trị mới cho `name` rồi chạy lại chương trình.
 $markdown$, CURRENT_TIMESTAMP
 FROM course
 WHERE slug = 'python-co-ban'
-ON CONFLICT DO NOTHING;
+  AND NOT EXISTS (SELECT 1 FROM lesson WHERE course_id = course.id AND position = 2)
+ON CONFLICT (course_id, slug) DO NOTHING;

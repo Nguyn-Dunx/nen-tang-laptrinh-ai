@@ -7,5 +7,5 @@ SELECT id, 'published-child', 'Published child', 1, 'Test fixture', CURRENT_TIME
 FROM course WHERE slug = 'draft-fixture';
 
 INSERT INTO lesson (course_id, slug, title, position, body_markdown)
-SELECT id, 'draft-child', 'Draft child', 3, 'Test fixture'
+SELECT id, 'draft-child', 'Draft child', 100, 'Test fixture'
 FROM course WHERE slug = 'python-co-ban';

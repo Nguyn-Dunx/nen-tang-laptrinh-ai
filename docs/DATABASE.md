@@ -47,6 +47,8 @@ erDiagram
 
 Sandbox nối `exercise.lesson_id` với `lesson`. PostgreSQL giữ bài nộp và verdict. Worker dùng `attempt_count` và `lease_expires_at` để kiểm soát recovery. V7 cấp mặc định mà giữ các giá trị đã cấu hình, V8 bổ sung lease. [Mô hình dữ liệu Sandbox](sandbox/DATA-MODEL.md) · [ADR worker](adr/0002-sandbox-worker-and-queue.md)
 
+V9 thêm view `published_lesson` và kiểm tra vị trí bài duy nhất ở cuối câu lệnh cập nhật. Nhờ vậy một câu lệnh có thể đổi chỗ hai bài mà giữ nguyên ID và liên kết bài tập. Ghi bài học và đổi thứ tự đều khóa row khóa học trong transaction. [Migration V9](../backend/src/main/resources/db/migration/V9__support_course_authoring.sql)
+
 - Tên bảng/cột dùng `snake_case`. Đặt khóa chính `id`, khóa ngoại `<table>_id` và cột thời điểm `timestamptz` để việc join và xử lý timezone nhất quán.
 - Tạo migration `V<n>__<verb>_<noun>.sql` theo version kế tiếp. Giữ checksum của migration đã áp dụng. Chạy Flyway trên DB trống và DB ở version trước để kiểm tra cài mới lẫn nâng cấp.
 - Repository bind tất cả giá trị, chọn cột cần đọc, có `ORDER BY` ổn định khi phân trang. Với index mới, ghi truy vấn đích và kiểm tra kế hoạch bằng `EXPLAIN` trên dữ liệu đại diện.

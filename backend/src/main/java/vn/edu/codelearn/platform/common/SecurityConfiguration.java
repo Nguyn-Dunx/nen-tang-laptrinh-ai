@@ -6,6 +6,7 @@ import jakarta.servlet.DispatcherType;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -37,6 +38,8 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
 class SecurityConfiguration {
 
     private static final String AUTH_API = "/api/v1/auth";
+    private static final String COURSE_ADMIN_API = "/api/v1/admin/courses/**";
+    private static final PathPatternRequestMatcher COURSE_ADMIN = pathPattern(COURSE_ADMIN_API);
     private static final PathPatternRequestMatcher PROFILE =
             pathPattern(HttpMethod.GET, AUTH_API + "/me");
     private static final PathPatternRequestMatcher SUBMISSION_CREATE =
@@ -49,6 +52,7 @@ class SecurityConfiguration {
             pathPattern(HttpMethod.GET, "/api/v1/exercises/{exerciseId}/submissions");
 
     @Bean
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.SERVLET)
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             @Qualifier("handlerExceptionResolver") HandlerExceptionResolver exceptionResolver,
@@ -103,6 +107,7 @@ class SecurityConfiguration {
                         "/api/v1/courses",
                         "/api/v1/courses/{courseSlug}",
                         "/api/v1/courses/{courseSlug}/lessons/{lessonSlug}",
+                        "/api/v1/courses/{courseSlug}/lessons/{lessonSlug}/exercises",
                         "/api/v1/exercises/{exerciseId}",
                         "/actuator/health/liveness",
                         "/actuator/health/readiness",
@@ -112,6 +117,8 @@ class SecurityConfiguration {
                 .anonymous()
                 .requestMatchers(PROFILE)
                 .authenticated()
+                .requestMatchers(COURSE_ADMIN)
+                .hasRole("ADMIN")
                 .requestMatchers(SUBMISSION_CREATE)
                 .hasAnyRole("LEARNER", "AUTHOR", "ADMIN")
                 .requestMatchers(SUBMISSION_READ, SUBMISSION_DETAIL, SUBMISSION_HISTORY)
@@ -122,6 +129,7 @@ class SecurityConfiguration {
 
     private boolean requiresAuthentication(jakarta.servlet.http.HttpServletRequest request) {
         return PROFILE.matches(request)
+                || COURSE_ADMIN.matches(request)
                 || SUBMISSION_CREATE.matches(request)
                 || SUBMISSION_READ.matches(request)
                 || SUBMISSION_DETAIL.matches(request)
@@ -154,23 +162,24 @@ class SecurityConfiguration {
         config.setAllowedMethods(List.of("GET"));
         config.setExposedHeaders(List.of(RequestIdFilter.HEADER));
 
-        CorsConfiguration auth = new CorsConfiguration(config);
-        auth.setAllowedMethods(List.of("GET", "POST"));
-        auth.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
-        auth.setAllowCredentials(true);
-        auth.validateAllowCredentials();
-
-        CorsConfiguration submissions = new CorsConfiguration(config);
-        submissions.setAllowedMethods(List.of("GET", "POST"));
-        submissions.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
-        submissions.setAllowCredentials(true);
-        submissions.validateAllowCredentials();
+        var authenticated = credentialedCors(config, List.of("GET", "POST"));
+        var courseAdmin = credentialedCors(config, List.of("GET", "POST", "PUT"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration(AUTH_API + "/**", auth);
-        source.registerCorsConfiguration("/api/v1/exercises/*/submissions", submissions);
-        source.registerCorsConfiguration("/api/v1/submissions/**", submissions);
+        source.registerCorsConfiguration(AUTH_API + "/**", authenticated);
+        source.registerCorsConfiguration(COURSE_ADMIN_API, courseAdmin);
+        source.registerCorsConfiguration("/api/v1/exercises/*/submissions", authenticated);
+        source.registerCorsConfiguration("/api/v1/submissions/**", authenticated);
         source.registerCorsConfiguration("/api/v1/**", config);
         return source;
+    }
+
+    private CorsConfiguration credentialedCors(CorsConfiguration defaults, List<String> methods) {
+        var config = new CorsConfiguration(defaults);
+        config.setAllowedMethods(methods);
+        config.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
+        config.setAllowCredentials(true);
+        config.validateAllowCredentials();
+        return config;
     }
 }

@@ -58,12 +58,10 @@ class CatalogRepository {
     List<CatalogViews.LessonSummary> findPublishedLessons(String courseSlug) {
         return jdbc.sql(
                         """
-                SELECT lesson.slug, lesson.title, lesson.position
-                FROM lesson
-                JOIN course ON course.id = lesson.course_id
-                WHERE course.slug = :courseSlug AND course.published_at IS NOT NULL
-                    AND lesson.published_at IS NOT NULL
-                ORDER BY lesson.position
+                SELECT slug, title, position
+                FROM published_lesson
+                WHERE course_slug = :courseSlug
+                ORDER BY position
                 """)
                 .param("courseSlug", courseSlug)
                 .query(
@@ -78,11 +76,14 @@ class CatalogRepository {
     Optional<CatalogViews.LessonDetail> findPublishedLesson(String courseSlug, String lessonSlug) {
         return jdbc.sql(
                         """
-                SELECT course.slug AS course_slug, lesson.slug, lesson.title, lesson.position, lesson.body_markdown
-                FROM lesson
-                JOIN course ON course.id = lesson.course_id
-                WHERE course.slug = :courseSlug AND lesson.slug = :lessonSlug
-                    AND course.published_at IS NOT NULL AND lesson.published_at IS NOT NULL
+                WITH ordered_lessons AS (
+                    SELECT course_slug, slug, title, position, body_markdown,
+                           lag(slug) OVER (ORDER BY position) AS previous_slug,
+                           lead(slug) OVER (ORDER BY position) AS next_slug
+                    FROM published_lesson
+                    WHERE course_slug = :courseSlug
+                )
+                SELECT * FROM ordered_lessons WHERE slug = :lessonSlug
                 """)
                 .param("courseSlug", courseSlug)
                 .param("lessonSlug", lessonSlug)
@@ -93,7 +94,20 @@ class CatalogRepository {
                                         row.getString("slug"),
                                         row.getString("title"),
                                         row.getInt("position"),
-                                        row.getString("body_markdown")))
+                                        row.getString("body_markdown"),
+                                        row.getString("previous_slug"),
+                                        row.getString("next_slug")))
+                .optional();
+    }
+
+    Optional<Long> findPublishedLessonId(String courseSlug, String lessonSlug) {
+        return jdbc.sql(
+                        """
+                SELECT id FROM published_lesson WHERE course_slug = :courseSlug AND slug = :lessonSlug
+                """)
+                .param("courseSlug", courseSlug)
+                .param("lessonSlug", lessonSlug)
+                .query(Long.class)
                 .optional();
     }
 }

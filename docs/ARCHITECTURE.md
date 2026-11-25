@@ -40,7 +40,7 @@ flowchart LR
 
 | Module | Kiến trúc nội bộ | Trạng thái |
 | --- | --- | --- |
-| `content` | `CatalogController → CatalogService → CatalogRepository`, DTO catalog và bảng `course`, `lesson`. | API đọc đã xuất bản. Admin và xuất bản theo [kế hoạch Khóa học](COURSE_MODULE_PLAN.md). |
+| `content` | `CatalogController → CatalogService → CatalogRepository` cho API đọc. `CourseAdminController → CourseAdminService → CourseAdminRepository` cho biên tập và xuất bản. | Catalog, điều hướng, quản trị ADMIN và tìm bài tập theo slug. |
 | `identity` | `AuthController → AuthService → AccountRepository`. Spring Security cấp quyền, Spring Session JDBC lưu phiên. `CurrentUser` cung cấp ID cho module khác. | Email, hồ sơ, đổi và thu hồi phiên hoạt động. |
 | `sandbox` | `ExerciseController → ExerciseService → ExerciseRepository` đọc bài tập và view test công khai. `SandboxClient` là port, `Judge0Client` là adapter của worker. | API bài tập, cấu hình giới hạn và adapter có test với stub. |
 | `submission` | `SubmissionController → SubmissionService → SubmissionRepository`. Worker dùng `GradingService` và `GradingRepository`, nối Redis qua `SubmissionQueue`. | Nộp bài, polling, lịch sử và verdict Python có kiểm thử. |
@@ -50,7 +50,7 @@ flowchart LR
 
 - Mỗi module ghi bảng của mình qua repository nội bộ. Module gọi nhau qua API Java công khai và model biên. Một PR thêm dependency phải kiểm tra hướng phụ thuộc và tránh chu trình để giữ khả năng tách module.
 - PostgreSQL là nguồn dữ liệu chuẩn cho bài nộp. Sau commit, API enqueue ID qua Redis. Worker có thể lấy bài chờ từ PostgreSQL, cập nhật lease trước từng test case và chỉ ghi kết quả nếu còn giữ đúng attempt. Rollout runner thực cần môi trường cô lập và nghiệm thu riêng. [Thiết kế Sandbox](sandbox/ARCHITECTURE.md)
-- Phần giao với Khóa học dùng `exercise.lesson_id`. Truy vấn bài tập hiện join để lọc trạng thái xuất bản của khóa và bài. Hợp đồng khám phá bài tập theo bài học cần nằm trong OpenAPI khi tích hợp frontend.
+- Khóa học sở hữu view `published_lesson` để Catalog, Sandbox và Submission dùng chung quy tắc hiển thị. `ExerciseCatalog` cho phép Catalog đọc tóm tắt bài tập theo ID nội bộ của bài học. [Hợp đồng Khóa học](COURSE_MODULE.md) · [OpenAPI](api/openapi.yaml)
 
 Ví dụ ranh giới Java cho module tương lai.
 

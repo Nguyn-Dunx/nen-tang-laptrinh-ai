@@ -1,7 +1,10 @@
 package vn.edu.codelearn.platform;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -73,6 +76,31 @@ class ExerciseIntegrationTest {
         mvc.perform(get("/api/v1/exercises/{exerciseId}", Long.MAX_VALUE))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("EXERCISE_NOT_FOUND"));
+    }
+
+    @Test
+    void discoversExercisesBySlugAndPreservesOwnedHistoryAfterUnpublish() throws Exception {
+        long id = exerciseId("sandbox-published-exercise");
+        String lesson = "/api/v1/courses/python-co-ban/lessons/xin-chao-python/exercises";
+        mvc.perform(get(lesson))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(id))
+                .andExpect(jsonPath("$[0].publicTests").doesNotExist());
+        mvc.perform(
+                        put("/api/v1/admin/courses/python-co-ban/publication")
+                                .with(user("admin").roles("ADMIN"))
+                                .with(csrf().asHeader())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content("{\"published\":false}"))
+                .andExpect(status().isOk());
+
+        mvc.perform(get(lesson)).andExpect(status().isNotFound());
+        assertExerciseNotFound("sandbox-published-exercise");
+        mvc.perform(
+                        get("/api/v1/exercises/{id}/submissions", id)
+                                .with(user("sandbox-fixture@example.test").roles("LEARNER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1));
     }
 
     private void assertExerciseNotFound(String title) throws Exception {

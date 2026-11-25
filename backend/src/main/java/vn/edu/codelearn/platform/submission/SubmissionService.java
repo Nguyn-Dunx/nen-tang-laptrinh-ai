@@ -121,7 +121,8 @@ class SubmissionService {
     @Transactional(readOnly = true)
     SubmissionViews.Page history(long exerciseId, int page, int size) {
         long userId = currentUser.id();
-        if (!submissions.publishedExerciseExists(exerciseId)) {
+        if (!submissions.publishedExerciseExists(exerciseId)
+                && !submissions.hasHistory(userId, exerciseId)) {
             throw new ApiException(HttpStatus.NOT_FOUND, "EXERCISE_NOT_FOUND");
         }
         if (page < 0 || size < 1 || size > 50) {
