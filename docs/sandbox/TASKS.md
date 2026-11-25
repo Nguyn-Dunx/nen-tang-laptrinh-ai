@@ -2,11 +2,11 @@
 
 ## 1. Mục đích và cách dùng
 
-- Đây là **danh sách task đề xuất**. **Chưa task nào được làm.** Mọi trạng thái ban đầu là `Chưa làm`.
+- Đây là danh sách task, acceptance criteria và trạng thái triển khai hiện tại; không đánh dấu nghiệm thu Judge0 thật nếu chưa có bằng chứng.
 - Mỗi phiên làm **đúng MỘT task**. Task tự đứng được: biết cần đọc gì, được chạm gì, xong khi nào, verify bằng lệnh nào, khi nào phải dừng hỏi người.
 - Phạm vi: `00-SCOPE.md`. Quy tắc làm việc chung của repo: `AGENTS.md` ở root. File này không lặp lại cả hai.
 - Nhãn: "(đề xuất)" là tên/ranh giới chưa có trong repo, phải khớp `01`, `02`, `04` khi các file đó chốt. `TODO(xác nhận)` là chưa chốt.
-- Hiện trạng: repo có catalog chỉ đọc, identity và Exercise read API. **CHƯA CÓ:** Redis, queue/worker, SSE, Judge0, rate limit, nộp bài và chấm sandbox.
+- Hiện trạng: đã có Redis, API nộp bài và polling, rate limit, worker riêng và Judge0 adapter. Judge0 thật, SSE, kiểm thử tải và các lớp cách ly vẫn chưa được nghiệm thu.
 
 ## 2. Quy tắc áp dụng cho mọi task
 
@@ -31,17 +31,17 @@
 
 | Task | Tên | Phụ thuộc | Cần thật (PG / Redis / Judge0) | Cần người duyệt trước? | Bị chặn bởi cổng (mục 5) | Trạng thái |
 |---|---|---|---|---|---|---|
-| T0 | Spike Judge0 | Không | Judge0 thật (VPS test) | Có: kết quả quyết định giữ Judge0 | G3, G7 | Chưa làm |
-| T1 | Auth / `CurrentUser` stub | Không (độc lập T0) | PG | Có nếu chọn auth thật | G1 | Chưa làm |
+| T0 | Spike Judge0 | Không | Judge0 thật (VPS test) | Có: kết quả quyết định giữ Judge0 | G3, G7 | Chưa làm; chưa chạy Judge0 thật |
+| T1 | Auth / `CurrentUser` | Không (độc lập T0) | PG | Có nếu chọn auth thật | G1 | Đã triển khai session hiện có + CSRF, LEARNER trở lên |
 | T2a | Migration + fixture SQL | Schema catalog V1 và identity V2 | PG | Không | Không | Xong (2026-11-25, nhánh `feat/sandbox-coding-p1`) |
 | T2b | Exercise read API | T2a | PG | Không | Không | Xong (2026-11-25, nhánh `feat/sandbox-coding-p1`; chưa commit) |
-| T3a | Nhận bài + giới hạn + hint ladder | T1, T2 | PG | Có: kiểu `user_id`, đường dẫn | G1 | Chưa làm |
-| T3b | Rate limit + queue (Redis) | T3a | PG + Redis | **Có: Redis, dependency, CI** | G2 | Chưa làm |
-| T4a | Judge0 adapter + stub | T0, T2 | PG (stub, không Judge0 thật) | Không | G3 | Chưa làm |
-| T4b | Worker + tổng hợp verdict/điểm | T3b, T4a | PG + Redis | Có: cách đóng gói worker | G2, G4 | Chưa làm |
-| T4c | Retry + job quét bài kẹt | T4b | PG + Redis | Không | G4 | Chưa làm |
-| T5 | SSE + polling | T3, T4 | PG + Redis | **Có: xác thực SSE** | G5, G1 | Chưa làm |
-| T6 | Test bảo mật + tải | T3–T5; Judge0 thật | Cả ba | Có: công cụ tải | G2, G7 | Chưa làm |
+| T3a | Nhận bài + giới hạn + hint ladder | T1, T2 | PG | Có: kiểu `user_id`, đường dẫn | G1 | Một phần; submission/history/detail có, hint ladder chưa có |
+| T3b | Rate limit + queue (Redis) | T3a | PG + Redis | **Đã được duyệt** | G2 | Đã triển khai; integration test xác nhận enqueue sau commit |
+| T4a | Judge0 adapter + stub | T0, T2 | PG (stub, không Judge0 thật) | Không | G3 | Adapter và HTTP stub test có; spike thật còn chờ |
+| T4b | Worker + tổng hợp verdict/điểm | T3b, T4a | PG + Redis | **Worker tiến trình riêng đã được duyệt** | G2, G4 | Worker và grading service có test; end-to-end queue-to-worker còn thiếu |
+| T4c | Retry + job quét bài kẹt | T4b | PG + Redis | Không | G4 | Đã triển khai; chưa nghiệm thu với Judge0 thật |
+| T5 | SSE + polling | T3, T4 | PG + Redis | SSE chưa được triển khai | G5, G1 | Polling có; SSE chưa làm |
+| T6 | Test bảo mật + tải | T3–T5; Judge0 thật | Cả ba | Có: công cụ tải | G2, G7 | Chưa nghiệm thu N2/N4 hoặc tải |
 | T7 | Hoàn tất | Tất cả | PG | Không | Không | Chưa làm |
 
 **Thứ tự tổng thể:** T0 → T1 → T2 → T3 → T4 → T5 → T6 → T7 (đúng thứ tự phân tích). T1 có thể làm song song T0.
@@ -366,35 +366,26 @@
 
 | Mã | Quyết định | Task bị ảnh hưởng | Ai quyết | Ghi vào đâu sau khi chốt |
 |---|---|---|---|---|
-| G1 | Auth thật (JWT + role) hay chỉ `CurrentUser` stub ở `dev`; cookie hay token | T1, T3a, T5 | Nhóm | `00` mục 10; `04` mục 2; `05` mục 5 |
-| G2 | Đưa Redis vào compose, CI, client; hoặc bỏ Redis dùng PG `SKIP LOCKED` (lệch đặc tả) | T3b, T4b, T5, T6 | Nhóm duyệt | `01`; `06` mục 11 |
-| G3 | Poll hay `wait=true` khi gọi Judge0 | T0, T4a | Nhóm, dựa kết quả T0 | `03` mục 3, 11; `01` |
-| G4 | Worker đóng gói: cùng tiến trình hay tách | T4b, T4c | Nhóm | `01` (ADR-E) |
-| G5 | Xác thực cho SSE/EventSource | T5 | Nhóm, cùng G1 | `04` mục 5, 11 |
-| G6 | Có endpoint admin sửa config giới hạn không; GET Exercise công khai hay xác thực | T2b, T3a | Nhóm | `04` mục 4.7, 10; `00` mục 10 |
-| G7 | Giữ Judge0 hay kích hoạt dự phòng (Judge0 dịch vụ / Piston) | T0 và mọi task sau | Nhóm | `05` mục 8; rà lại `01`, `03`, `05` |
-
-- Nếu G6 chưa chốt: chỉ làm bảng cấu hình và đọc từ bảng, không endpoint admin.
+| G1 | Auth dùng session hiện tại + CSRF và vai trò LEARNER trở lên | T1, T3a | Đã chốt với người dùng | Các endpoint submission |
+| G2 | Dùng Redis cho compose dev, CI, queue và rate limit | T3b, T4b | Đã chốt với người dùng | `infra/docker-compose.dev.yml`, CI |
+| G3 | Worker dùng `wait=false` và polling token Judge0 | T0, T4a | Đã chọn cho implementation; chưa xác minh Judge0 thật | `Judge0Client` |
+| G4 | Worker là tiến trình riêng dùng profile `worker` | T4b, T4c | Đã chốt với người dùng | `application-worker.yml` |
+| G5 | Xác thực SSE/EventSource | T5 | Chưa chốt; SSE chưa triển khai | Khi mở lại T5 |
+| G6 | Không có endpoint admin; GET Exercise công khai | T2b, T3a | Đã chốt với người dùng | API hiện tại |
+| G7 | Dự kiến self-host Judge0; không chạy trên host dùng chung | T0 và mọi task sau | Đã chọn; chờ môi trường cô lập để xác minh | Judge0 deployment |
 
 ## 6. Quy ước cập nhật file này
 
 - Đánh dấu xong (đề xuất): `Trạng thái: Xong (YYYY-MM-DD, PR/commit <tham chiếu>)`, và tick các checkbox acceptance.
 - Làm dở: `Đang làm (ghi chú còn thiếu gì)`. Bị chặn: `Chặn bởi G<n>`.
 - Chỉ đánh dấu xong khi mọi acceptance criteria đạt và `./mvnw verify` xanh.
-- Cập nhật `PROJECT_STATUS.md` khi xong một giai đoạn (T0, T2, T4, T5, T7). Vị trí: `TODO(xác nhận)`.
+- Cập nhật `PROJECT_STATUS.md` khi trạng thái triển khai thay đổi.
 - Tách hoặc thêm task: **phải hỏi người**. Không thêm task ngoài phạm vi `00`.
 - Tên package/class/migration trong file này là đề xuất. Khi chốt ở `01`, `02`, `04`, cập nhật lại đây.
 - Task phát sinh việc ngoài phạm vi (SB-01, SB-07 đến SB-10, ngôn ngữ ngoài Python, frontend, trợ lý AI, staging/production): dừng và hỏi.
 
 ## 7. Điểm cần xác nhận
 
-- `TODO(xác nhận):` vị trí và nội dung `PROJECT_STATUS.md`.
-- `TODO(xác nhận):` lệnh chạy test Judge0 thật (N2, N4) và test tải.
-- `TODO(xác nhận):` cách chạy Redis ở dev và CI.
-- `TODO(xác nhận):` auth thật hay chỉ stub (G1).
-- `TODO(xác nhận):` poll hay `wait=true` (G3).
-- `TODO(xác nhận):` worker đóng gói thế nào (G4).
-- `TODO(xác nhận):` có endpoint admin config không (G6).
-- `TODO(xác nhận):` nơi lưu báo cáo spike và bằng chứng nghiệm thu.
-- `TODO(xác nhận):` tên package, class, migration cuối cùng (theo `01`, `02`, `04`).
-- `TODO(xác nhận):` có tách thêm task nào không khi thực tế quá lớn cho một phiên.
+- Judge0 thật, phiên bản/cấu hình isolation và N2/N4 vẫn cần xác minh trong môi trường cô lập.
+- SSE chưa triển khai; quyết định xác thực SSE chỉ cần khi tiếp tục T5.
+- Cần kiểm thử end-to-end queue-to-worker và bằng chứng Judge0 thật trước khi đánh dấu hoàn tất T4/T7.

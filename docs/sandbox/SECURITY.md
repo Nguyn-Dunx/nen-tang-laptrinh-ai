@@ -2,15 +2,15 @@
 
 ## 1. Mục đích và phạm vi
 
-- Đây là **đặc tả bảo mật đề xuất**. Repo chưa có mã cho auth, Redis, worker, Judge0, rate limit, nộp bài. Mọi lớp bảo vệ sandbox dưới đây là kế hoạch, không phải thứ đang chạy.
+- Đây là đặc tả bảo mật và checklist nghiệm thu. Mã đã có session/CSRF/role cho submission, Redis queue/rate limit, worker riêng và Judge0 adapter. Các lớp cô lập bên Judge0 và kiểm thử N2/N4 thật chưa được xác minh.
 - **Nguyên tắc nền: mã người dùng là KHÔNG TIN CẬY.** Không chạy trong JVM của ứng dụng. Mọi thực thi đi qua Judge0 (adapter) trên VPS riêng.
 - Phạm vi: backend cho SB-02 đến SB-06, NF-04, N4. Ngoài phạm vi (SB-01 iframe, SB-07 đến SB-10, ngôn ngữ ngoài Python, trợ lý AI, staging/production, giám sát): xem `00-SCOPE.md`.
 - Không lặp: kiến trúc và ADR → `01-ARCHITECTURE.md`; cột bảng → `02-DATA-MODEL.md`; ánh xạ verdict, giới hạn, hành vi khi vượt → `03-GRADING-SPEC.md`; endpoint, DTO, mã lỗi → `04-API-CONTRACT.md`; payload và kịch bản test → `06-TEST-PLAN.md`.
 - Nhãn: "(đề xuất)" là quy tắc không có trong báo cáo. `TODO(xác nhận)` là giá trị chưa có, điền sau spike tuần 1–2 (M1, R7).
 
-**ĐÃ CÓ trong mã:** Spring Security stateless; whitelist GET; mọi route/method còn lại bị từ chối; CORS theo danh sách origin (profile `dev` mặc định cho phép frontend cổng 3000); `application/problem+json` có `code` và `traceId`; `X-Request-Id` đưa vào MDC; `infra/docker-compose.dev.yml` chỉ có PostgreSQL 16; `.env.example` cho dev.
+**ĐÃ CÓ trong mã:** session/CSRF và vai trò cho submission; whitelist route; CORS theo danh sách origin (profile `dev` mặc định cho phép frontend cổng 3000); `application/problem+json` có `code` và `traceId`; `X-Request-Id` đưa vào MDC; PostgreSQL và Redis trong compose dev; kiểm tra giới hạn theo cấu hình; worker/Judge0 adapter; không gửi `expected_output` hoặc callback.
 
-**CHƯA CÓ:** auth/phân quyền, Redis, queue/worker, SSE, Judge0, sandbox, rate limit, nộp bài, staging/production, giám sát.
+**CHƯA ĐƯỢC NGHIỆM THU:** Judge0 thật và isolation, tách VPS/firewall, N2/N4, kiểm thử tải, SSE, staging/production và giám sát.
 
 ## 2. Mô hình đe dọa
 
@@ -132,23 +132,17 @@ Không có payload ở đây. Payload và mã chạy được: `06-TEST-PLAN.md`
 
 Route cụ thể và mã lỗi: `04-API-CONTRACT.md` mục 3, 7, 10.
 
-**`SecurityConfiguration` (thay đổi cần có):**
-- Hiện tại: stateless, chỉ whitelist GET. Chỉ mở **đúng** route ở `04` mục 3. Không nới whitelist ngoài đó. Route/method khác vẫn bị từ chối.
-- `POST` nộp bài **phải xác thực**. Khách chưa đăng nhập: 401.
-- Route lịch sử, xem lại, trạng thái, SSE: xác thực + kiểm tra chủ sở hữu.
-- `GET` exercise công khai hay cần đăng nhập: `TODO(xác nhận)`, theo `04`.
-- CORS: giữ như hiện có (danh sách origin). Không dùng `*` kèm credentials. Không nới hơn mức cần thiết.
-- CSRF: nếu cơ chế xác thực dùng cookie thì phải xem lại CSRF. Nếu dùng token header thì giữ nguyên. Chốt cùng auth: `TODO(xác nhận)`.
-- Route admin config (nếu có): chỉ vai trò Quản trị.
+**`SecurityConfiguration` (đã triển khai cho các endpoint hiện có):**
+- Session hiện tại + CSRF; chỉ mở route đã nêu trong `04`. Route/method khác vẫn bị từ chối.
+- `POST` nộp bài yêu cầu xác thực và vai trò LEARNER trở lên.
+- Route lịch sử, xem lại và trạng thái kiểm tra chủ sở hữu trong truy vấn. SSE chưa triển khai.
+- Exercise đọc công khai; CORS vẫn dùng danh sách origin, không dùng `*` kèm credentials.
+- API quản trị config chưa có.
 
-**`CurrentUser` stub:**
-- Chỉ ở profile `dev`. **Phải bị vô hiệu ở mọi profile khác.** Rủi ro: stub lọt vào production cho phép giả danh bất kỳ ai.
-- Cách đảm bảo (đề xuất):
-  - Bean stub chỉ đăng ký khi profile `dev` hoạt động (`@Profile("dev")`).
-  - Test khẳng định: ở profile không phải `dev`, không có bean stub và request thiếu xác thực nhận 401.
-  - Khởi động ở profile khác `dev` mà phát hiện stub thì ứng dụng **không khởi động được** (fail-fast).
-  - Tên profile `dev` là đã có. Cách cấu hình profile production: `TODO(xác nhận)`.
-- Auth thật (JWT + role, cookie hay token) và xác thực cho SSE/EventSource: chưa chốt, `TODO(xác nhận)`, theo `04` mục 5.
+**`CurrentUser`:**
+- Lấy ID từ tài khoản gắn với authentication trong session; không dùng stub danh tính trong profile `dev`.
+- Hành vi của auth/session khi triển khai staging/production vẫn cần được rà soát trước khi deploy.
+- Xác thực SSE/EventSource chỉ cần chốt nếu triển khai SSE.
 
 **Quyền sở hữu submission:**
 - Truy vấn lịch sử/chi tiết luôn có điều kiện `user_id = :currentUser`. Không lấy rồi mới so sánh ở tầng ứng dụng.

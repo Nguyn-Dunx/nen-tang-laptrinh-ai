@@ -35,6 +35,7 @@ Invoke-RestMethod http://127.0.0.1:8080/api/v1/courses/python-co-ban/lessons/xin
 - Chạy trên macOS/Linux, đổi cổng, dừng DB và chạy test với PostgreSQL. [Cài đặt local](docs/ENVIRONMENT_SETUP.md) · [Kiểm thử](docs/TESTING_STRATEGY.md)
 - Chạy cả backend và PostgreSQL bằng Docker Compose hoặc thử luồng tài khoản qua PowerShell. [Compose local](docs/ENVIRONMENT_SETUP.md#chạy-cả-backend-bằng-compose) · [Thử API tài khoản](docs/AUTH_SECURITY.md#thử-api-tài-khoản)
 - Tích hợp và thay đổi API. [Hướng dẫn API](docs/API.md) · [OpenAPI](docs/api/openapi.yaml) · [Quy ước API](docs/API_GUIDELINES.md)
+- Chạy và kiểm thử nộp bài/chấm sandbox. [Thiết lập local](docs/ENVIRONMENT_SETUP.md#sandbox-nộp-bài-và-worker) · [Trạng thái hiện tại](docs/PROJECT_STATUS.md) · [Đặc tả sandbox](docs/sandbox/)
 - Hiểu module, migration và mốc triển khai. [Kiến trúc](docs/ARCHITECTURE.md) · [Cấu trúc thư mục](docs/FOLDER_STRUCTURE.md) · [Dữ liệu](docs/DATABASE.md) · [Lộ trình](docs/ROADMAP.md)
 - Bắt đầu một thay đổi. [Onboarding](docs/ONBOARDING.md) · [Đóng góp](CONTRIBUTING.md) · [Hướng dẫn agent](AGENTS.md) · [Changelog](CHANGELOG.md)
 - Kiểm tra mức sẵn sàng của bộ khung. [Tự rà soát và rủi ro còn lại](docs/RELEASE_READINESS.md)

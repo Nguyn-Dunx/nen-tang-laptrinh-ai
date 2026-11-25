@@ -2,7 +2,7 @@
 
 ## 1. Mục đích và phạm vi
 
-- Đây là **kế hoạch đề xuất**. Chưa có test sandbox nào. Judge0, Redis, worker, stub, auth, rate limit chưa tồn tại trong repo.
+- Đây là kế hoạch kiểm thử và trạng thái bằng chứng. Đã có unit test cho quy tắc chấm, HTTP stub cục bộ cho Judge0 adapter, integration test API/Redis/PostgreSQL; chưa có bằng chứng Judge0 thật, N2/N4 hay tải.
 - Phạm vi: kiểm thử SB-02 đến SB-06, UC10, NF-01, NF-02, NF-04, N2, N4 và thiết kế `docs/sandbox/fixtures/`. Ngoài phạm vi (SB-01, SB-07 đến SB-10, ngôn ngữ ngoài Python, kiểm thử frontend/iframe, trợ lý AI, staging/production, giám sát): xem `00-SCOPE.md`.
 - Ba tiêu chí nghiệm thu chính:
   - **N2** (M3, tuần 7–10): đúng verdict trên tối thiểu 30 bài nộp mẫu.
@@ -17,14 +17,17 @@
 - `backend/src/test/java/.../CatalogIntegrationTest.java`.
 - `backend/src/test/resources/catalog-fixtures.sql`.
 - Test tích hợp cần PostgreSQL, chỉ bật khi có biến `TEST_DB_URL`.
-- CI: `.github/workflows/backend-ci.yml` (Java 21, PostgreSQL 16, chạy `./mvnw verify`). CI **không** có Redis, **không** có Judge0.
+- Sandbox unit/integration test cho quy tắc chấm, Judge0 HTTP stub, giới hạn submission, quyền sở hữu và không rò rỉ hidden-test values.
+- CI: `.github/workflows/backend-ci.yml` (Java 21, PostgreSQL 16, Redis; chạy `./mvnw verify`). CI **không** có Judge0 thật.
 
-**KẾ HOẠCH (mọi thứ còn lại):** mọi test sandbox, Judge0 stub, test Redis, test tải, fixtures.
+**CÒN THIẾU:** test tích hợp đầy đủ từ queue đến worker với stub; Judge0 thật, N2/N4, test tải và bằng chứng isolation.
+
+**Bằng chứng gần nhất (2026-11-25):** `./mvnw --batch-mode --no-transfer-progress verify` trên DB test riêng: 35 test, 0 failure, 0 error, 0 skipped; Spotless và Checkstyle xanh. Compose config hợp lệ. Không chạy Judge0 thật hoặc mã người dùng trên Judge0.
 
 **Nguyên tắc:**
 - Không `@Disabled` test. Không sửa test cho xanh thay vì sửa lỗi thật.
 - `./mvnw verify` phải xanh trước khi tuyên bố xong.
-- CI không phụ thuộc Judge0 hay Redis thật. Phần cần chúng chạy thủ công/nightly (mục 3).
+- CI không phụ thuộc Judge0 thật. Redis được cung cấp trong CI; phần Judge0 thật/tải chỉ chạy trong môi trường cô lập.
 - Test không tự quy định lại quy tắc của `03`. Test bám theo `03`. Nếu `03` đổi thì sửa test theo.
 - Mỗi mục kiểm thử có: đầu vào, kết quả mong đợi, cách chạy, nơi lưu bằng chứng.
 - **Fixture tấn công chỉ chạy trên Judge0 của môi trường test/spike.** Tuyệt đối không chạy trên production hay máy chính.
@@ -35,14 +38,15 @@
 | Tầng | Phạm vi | PG / Redis / Judge0 | Chạy ở đâu |
 |---|---|---|---|
 | Unit | Logic chấm: ánh xạ status, chuẩn hoá, điểm, ưu tiên verdict | Không cần cả ba | CI |
-| Tích hợp PG | Exercise read API, nộp bài, lịch sử, quyền sở hữu, truy vấn hint ladder | PG thật (`TEST_DB_URL`) | CI |
-| Tích hợp Judge0 stub | Luồng 3 pha, retry, job quét bài kẹt, lỗi hệ thống | PG thật + stub Judge0; Redis: `TODO` | CI |
-| Redis | Queue, rate limit, số bài chờ tối đa | Cách test chưa chốt (`TODO`) | `TODO(xác nhận)` |
+| Tích hợp PG | Exercise read API, nộp bài, lịch sử, quyền sở hữu | PG thật (`TEST_DB_URL`) | CI |
+| Adapter stub | Judge0 request/poll qua HTTP stub cục bộ | Không cần dịch vụ ngoài | CI |
+| Worker grading service | Chấm test công khai/ẩn, dừng khi Compile Error | Stub `SandboxClient` | CI |
+| Redis | Rate limit và enqueue sau commit qua submission API; worker recovery chưa có test end-to-end | Redis service | CI |
 | Judge0 thật | N2 (≥ 30 ca) + N4 kịch bản 1 đến 7 | Judge0 thật (môi trường test/spike) | Thủ công / nightly |
 | Rate limit mức tích hợp | N4 kịch bản 8 | Redis hoặc thay thế (`TODO`) | `TODO(xác nhận)` |
 | Tải | NF-02, NF-01 | Judge0 thật + Redis + PG | Thủ công trước M5 |
 | Rò rỉ bí mật | Quét response/log mọi endpoint sandbox | PG + stub | CI |
-| Profile/Auth | `CurrentUser` stub không hoạt động ngoài `dev` | Không cần dịch vụ ngoài | CI |
+| Profile/Auth | Session, CSRF, role và quyền sở hữu submission | Không cần dịch vụ ngoài | CI |
 
 ## 4. Unit test logic chấm
 

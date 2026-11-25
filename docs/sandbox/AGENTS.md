@@ -13,14 +13,14 @@ Repo hiện là bộ khung backend. Chưa có frontend.
 
 | Hạng mục | ĐÃ CÓ trong mã | CHƯA CÓ |
 | --- | --- | --- |
-| Stack | Java 21, Spring Boot 4.1.0, PostgreSQL 16, `JdbcClient`, Flyway, Maven Wrapper | Redis |
+| Stack | Java 21, Spring Boot 4.1.0, PostgreSQL 16, Redis, `JdbcClient`, Flyway, Maven Wrapper | — |
 | Nội dung | Đọc khóa học và bài học đã xuất bản; seed demo Python cơ bản (chỉ profile `dev`) | CMS, quy trình duyệt/xuất bản, blog, roadmap |
-| API | Health, liveness, readiness, 3 endpoint catalog, identity theo phiên và GET Exercise công khai | Phân quyền submission, lưu tiến độ, playground, nộp bài, trợ lý AI, SSE |
-| Chạy và chấm mã | Exercise read API và schema dữ liệu sandbox | Judge0, nộp bài/chấm mã, queue/worker |
-| Hạ tầng | Docker Compose PostgreSQL cho dev, CI backend | Staging/production, giám sát |
+| API | Health, catalog, identity theo phiên, Exercise read, submission/polling/history/detail | Lưu tiến độ, playground, trợ lý AI, SSE |
+| Chạy và chấm mã | Submission API, rate limit/Redis queue, worker profile riêng, Judge0 adapter, quy tắc chấm | Judge0 thật và isolation chưa nghiệm thu |
+| Hạ tầng | Docker Compose PostgreSQL + Redis cho dev, CI backend | Staging/production, giám sát |
 | Giao diện | (không có) | Frontend |
 
-API hiện có (đều `GET`):
+API hiện có:
 
 | Endpoint | Ghi chú |
 | --- | --- |
@@ -31,6 +31,10 @@ API hiện có (đều `GET`):
 | `/api/v1/courses/{courseSlug}` | Khóa và danh sách bài đã xuất bản |
 | `/api/v1/courses/{courseSlug}/lessons/{lessonSlug}` | Bài và nội dung Markdown |
 | `/api/v1/exercises/{exerciseId}` | Bài tập đã xuất bản, chỉ kèm test công khai |
+| `POST /api/v1/exercises/{exerciseId}/submissions` | Nộp Python, cần session + CSRF và vai trò LEARNER trở lên |
+| `GET /api/v1/submissions/{submissionId}` | Poll trạng thái/kết quả của submission thuộc user |
+| `GET /api/v1/exercises/{exerciseId}/submissions` | Lịch sử submission của user |
+| `GET /api/v1/submissions/{submissionId}/detail` | Mã nguồn và kết quả test của submission thuộc user |
 
 ## 2. Cấu trúc repo
 
@@ -39,18 +43,19 @@ API hiện có (đều `GET`):
 ├── AGENTS.md                      # file này
 ├── README.md                      # hướng dẫn chạy
 ├── .github/workflows/backend-ci.yml
-├── infra/docker-compose.dev.yml   # PostgreSQL 16 cho dev
+├── infra/docker-compose.dev.yml   # PostgreSQL 16 + Redis cho dev
 ├── docs/
 │   ├── api/openapi.yaml           # hợp đồng API (nguồn sự thật cho endpoint)
 │   ├── ROADMAP.md                 # kế hoạch 16 tuần (KẾ HOẠCH)
-│   └── sandbox/                   # tài liệu Coding + Sandbox (có thể CHƯA tồn tại)
+│   └── sandbox/                   # tài liệu Coding + Sandbox
 └── backend/
     ├── pom.xml, Maven Wrapper
     └── src/
         ├── main/java/vn/edu/codelearn/platform/
         │   ├── CodeLearnApplication.java
         │   ├── content/           # catalog: khóa học, bài học
-        │   ├── sandbox/           # Exercise read API
+        │   ├── sandbox/           # Exercise read API + Judge0 adapter
+        │   ├── submission/        # API, queue, worker, grading
         │   └── common/            # security, health, request id, xử lý lỗi
         ├── main/resources/
         │   ├── application.yml, application-dev.yml
@@ -65,13 +70,15 @@ Vai trò class hiện có:
 
 - `content/`: `CatalogController` (3 endpoint), `CatalogService` (truy vấn, phân trang, không tìm thấy), `CatalogRepository` (`JdbcClient`, lọc đã xuất bản), `CatalogViews` (record DTO).
 - `sandbox/`: `ExerciseController`, `ExerciseService`, `ExerciseRepository`, `ExerciseViews`; chỉ trả test công khai qua view `test_case_public`.
-- `common/`: `SecurityConfiguration` (stateless, whitelist GET, CORS), `HealthController`, `RequestIdFilter` (`X-Request-Id`, MDC), `ApiExceptionHandler` (Problem Detail).
+- `submission/`: nhận bài, giới hạn, Redis queue, lịch sử/polling/chi tiết và worker chỉ bật ở profile `worker`.
+- `sandbox/`: Exercise read API, cấu hình giới hạn và Judge0 adapter (chỉ worker gọi).
+- `common/`: `SecurityConfiguration` (session, CSRF, quyền route, CORS), `HealthController`, `RequestIdFilter` (`X-Request-Id`, MDC), `ApiExceptionHandler` (Problem Detail).
 - Migration `V1`: bảng `course`, `lesson`, ràng buộc slug/vị trí, cột thời điểm xuất bản.
 - Seed `R__seed_demo_catalog.sql`: chỉ nạp ở profile `dev`.
 - `application-dev.yml`: profile `dev` đọc `.env` nằm phía trên thư mục `backend`.
 - `.env.example`, `PROJECT_STATUS.md`: vị trí chính xác xem mục 10.
 
-Package `sandbox/` hiện có Exercise read API; phần Judge0 client chưa có. Package `submission/` chưa có.
+Judge0 thật, isolation mạng/tài nguyên và N2/N4 chưa được xác minh. Không chạy worker trên môi trường dùng chung để thực thi mã tùy ý.
 
 ## 3. Lệnh thường dùng
 

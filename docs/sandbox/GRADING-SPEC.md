@@ -2,7 +2,7 @@
 
 ## 1. Mục đích và phạm vi
 
-- Đây là **đặc tả đề xuất**. Repo chưa có mã chấm bài, worker, Judge0 adapter hay Redis. Mọi thứ dưới đây là thiết kế cần cài đặt.
+- Đây là đặc tả quy tắc chấm và tiêu chí nghiệm thu. Mã worker, Judge0 adapter, Redis queue và chấm điểm đã được triển khai; Judge0 thật và hành vi isolation vẫn chưa được xác minh.
 - Phạm vi: pha 2 (Thực thi) và pha 3 (Tổng hợp) cho SB-02 đến SB-06. MVP: Python, chỉ so khớp stdin/stdout. SB-09 và SB-10 ngoài phạm vi. Xem `00-SCOPE.md`.
 - Bảng, cột, vòng đời trạng thái `submission`: `02-DATA-MODEL.md`. Endpoint, DTO: `04-API-CONTRACT.md`. File này không lặp lại.
 - Nhãn: "(đề xuất)" là quy tắc không có trong báo cáo. `TODO(xác nhận)` là chưa kiểm chứng, gắn với spike Judge0 tuần 1–2 (rủi ro R7).

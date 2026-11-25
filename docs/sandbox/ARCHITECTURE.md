@@ -3,7 +3,7 @@
 ## 1. Mục đích và phạm vi
 
 - File này chốt kiến trúc cho tính năng Coding + Sandbox chấm bài: thành phần nào nằm ở đâu, gọi nhau thế nào, quyết định nào đã chốt và vì sao.
-- Đây là **THIẾT KẾ ĐỀ XUẤT, chưa có mã**. Hiện CHƯA CÓ: Redis, worker, SSE, Judge0, auth, package `submission` và `sandbox`. Không được coi chúng là đã tồn tại.
+- Đây là kiến trúc cùng trạng thái triển khai hiện tại. Redis, API submission/polling, worker tách tiến trình và Judge0 adapter đã có trong mã. Judge0 thật chưa được xác minh; SSE và triển khai cô lập vẫn còn ngoài phạm vi đã kiểm chứng.
 - Phạm vi và ngoài phạm vi: xem `00-SCOPE.md`.
 - Không lặp chi tiết của file khác: cột bảng và vòng đời trạng thái → `02-DATA-MODEL.md`; ánh xạ verdict, retry, chuẩn hoá output → `03-GRADING-SPEC.md`; endpoint và DTO → `04-API-CONTRACT.md`; checklist bảo mật và runbook Judge0 → `05-SECURITY.md`.
 - Quy ước nhãn: `(đề xuất)` = tên/số liệu/cơ chế do tài liệu này đề xuất, nguồn gốc không phải mã hiện có hay đặc tả; `TODO(xác nhận)` = chưa chốt, phải hỏi người trước khi code.
@@ -37,10 +37,12 @@ flowchart LR
 | Thành phần | Trạng thái |
 | --- | --- |
 | Backend API: `content/`, `common/` (Catalog, Security, Health, RequestId, ApiExceptionHandler) | ĐÃ CÓ |
-| Backend API: nộp bài, SSE, package `submission`, `sandbox` | CHƯA CÓ |
+| Backend API: submission, polling, package `submission`, `sandbox` | ĐÃ CÓ; SSE chưa có |
 | PostgreSQL 16 (`infra/docker-compose.dev.yml`) | ĐÃ CÓ |
-| Redis, Worker, Judge0, Nginx | CHƯA CÓ (compose dev chỉ có PostgreSQL) |
-| Auth (kể cả `CurrentUser`) | CHƯA CÓ |
+| Redis, worker profile riêng | ĐÃ CÓ (Redis trong compose dev) |
+| Judge0 adapter | ĐÃ CÓ; Judge0 thật chưa kiểm thử |
+| Nginx, triển khai cách ly Judge0 | CHƯA CÓ |
+| Auth/current user | Dùng session hiện có, CSRF và vai trò |
 
 ## 3. Ranh giới mạng và tin cậy
 
@@ -108,10 +110,10 @@ Quy tắc chấm (chuẩn hoá, ánh xạ verdict, điểm) nằm ở `03-GRADIN
 ### ADR-B: Judge0 không gọi ngược, worker chủ động lấy kết quả
 
 - **Bối cảnh**: Judge0 bị chặn truy cập ngược vào VPS chính; chỉ worker được gọi Judge0.
-- **Quyết định**: **KHÔNG dùng `callback_url`**. Worker tự lấy kết quả từ Judge0 bằng poll hoặc `wait=true`. Judge0 không public.
+- **Quyết định**: **KHÔNG dùng `callback_url`**. Worker gửi `wait=false` và poll token; Judge0 không public. Đây mới là implementation choice, chưa được đo/kiểm chứng với Judge0 thật.
 - **Lý do**: callback đòi Judge0 mở kết nối về máy chính, phá ranh giới mạng ở mục 3.
 - **Hệ quả**: worker giữ kết nối hoặc vòng poll tới Judge0; độ trễ và số kết nối ảnh hưởng NF-01 (mục 8). Chi tiết cơ chế ở `03-GRADING-SPEC.md`.
-- **Trạng thái**: Đã chốt (không callback, chỉ worker gọi). Chưa chốt: poll hay `wait=true` — `TODO(xác nhận)`.
+- **Trạng thái**: Poll được dùng trong mã; kết quả spike Judge0 thật còn thiếu.
 
 ### ADR-C: Trả kết quả qua SSE, polling là fallback
 
@@ -127,10 +129,10 @@ Quy tắc chấm (chuẩn hoá, ánh xạ verdict, điểm) nằm ở `03-GRADIN
 ### ADR-D: Package `submission` và `sandbox`, Judge0 sau một adapter
 
 - **Bối cảnh**: repo tổ chức package theo feature (`content`, `common`); cần thay được Judge0 bằng Piston (dự phòng) hoặc stub trong CI.
-- **Quyết định**: thêm package `submission` và `sandbox` cạnh `content`. Judge0 client nằm sau interface `SandboxClient` (đề xuất). Chiều phụ thuộc (đề xuất): `submission` → `sandbox`; `submission` được đọc dữ liệu bài tập từ `content`; `sandbox` không biết gì về `submission`; `content` không phụ thuộc `submission`.
+- **Quyết định**: package `submission` và `sandbox` nằm cạnh `content`. Judge0 client sau interface `SandboxClient`; `submission` dùng `sandbox`, `sandbox` không phụ thuộc `submission`; `content` không phụ thuộc `submission`.
 - **Lý do**: giữ convention hiện có; cô lập phần rủi ro cao (R7); đáp ứng NF-07 (tách sandbox khỏi phần còn lại).
-- **Hệ quả**: CI dùng bản stub của adapter, không cần Judge0 thật. Cấu trúc ở mục 6.
-- **Trạng thái**: Đề xuất.
+- **Hệ quả**: CI dùng HTTP stub cho adapter và fake client cho grading service, không cần Judge0 thật. Cấu trúc ở mục 6.
+- **Trạng thái**: Đã triển khai một phần; chưa có kiểm thử tích hợp đầy đủ từ queue đến worker.
 
 ### ADR-E: Worker đóng gói thế nào
 
@@ -138,7 +140,7 @@ Quy tắc chấm (chuẩn hoá, ánh xạ verdict, điểm) nằm ở `03-GRADIN
 - **Quyết định (đề xuất)**: cùng codebase Spring Boot, cùng artifact, chạy thành **tiến trình riêng** bằng một profile (tên profile `worker` là đề xuất). Không tách repo hay module Maven riêng ở MVP.
 - **Lý do**: tái dùng `JdbcClient`, cấu hình, convention; worker chậm hoặc chết không kéo API chết theo; scale độc lập (NF-07, NF-02).
 - **Hệ quả**: hai container từ một image trên VPS chính. Chỉ một trong hai tiến trình được chạy Flyway migration (chọn tiến trình nào: đề xuất API). Phương án thay thế bị loại: cùng tiến trình (worker chậm ảnh hưởng API); module tách (tốn công cho nhóm nhỏ).
-- **Trạng thái**: Chưa chốt — `TODO(xác nhận)`.
+- **Trạng thái**: Đã chọn worker profile riêng; chưa nghiệm thu triển khai vận hành.
 
 ### ADR-F: Auth và `CurrentUser`
 
@@ -146,7 +148,7 @@ Quy tắc chấm (chuẩn hoá, ánh xạ verdict, điểm) nằm ở `03-GRADIN
 - **Quyết định**: nộp bài chỉ phụ thuộc một abstraction lấy người dùng hiện tại, `CurrentUser`. Trong lúc chờ auth, `CurrentUser` stub **chỉ tồn tại ở profile `dev`**. Auth thật thay stub mà không đổi mã `submission`.
 - **Lý do**: không chặn việc làm sandbox; giữ chỗ cho cả hai hướng.
 - **Hệ quả**: stub tuyệt đối không bật ở profile khác. `SecurityConfiguration` chỉ mở **đúng các route** được nêu trong task (xem `05-SECURITY.md`, `07-TASKS.md`); không nới rộng ngoài đó.
-- **Trạng thái**: stub Đã chốt. Auth thật có thuộc phạm vi hay không: Chưa chốt — `TODO(xác nhận)`.
+- **Trạng thái**: Đã chọn session hiện có + CSRF và vai trò LEARNER trở lên cho submission.
 
 ### ADR-G: Bí mật không rời server
 

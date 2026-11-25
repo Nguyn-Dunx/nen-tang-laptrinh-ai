@@ -42,4 +42,11 @@ class AccountRepository {
                 .query(ACCOUNT)
                 .optional();
     }
+
+    Optional<Long> findIdByEmail(String email) {
+        return jdbc.sql("SELECT id FROM account WHERE email = :email")
+                .param("email", email)
+                .query(Long.class)
+                .optional();
+    }
 }

@@ -2,7 +2,7 @@
 
 ## 1. Mục đích và phạm vi
 
-- Đây là **contract đề xuất**. Chưa có mã cho Exercise API, nộp bài, SSE hay auth. Chỉ 6 endpoint GET ở mục 3 là ĐÃ CÓ.
+- Đây là contract và trạng thái triển khai. Exercise API, submission, polling, lịch sử và chi tiết đã có. SSE và API quản trị giới hạn chưa được triển khai.
 - Contract-first: sửa `docs/api/openapi.yaml` → kiểm tra không phá endpoint cũ → code → test → `./mvnw verify`. Chỉ thêm, không phá.
 - Phạm vi: SB-02 đến SB-06, UC10, phần backend của AD-03. Ngoài phạm vi (SB-01, SB-07 đến SB-10, ngôn ngữ ngoài Python, frontend, endpoint AI/chat): xem `00-SCOPE.md`.
 - Không lặp: cột bảng và vòng đời trạng thái → `02-DATA-MODEL.md`; ánh xạ verdict, tính điểm, retry → `03-GRADING-SPEC.md`; kiến trúc, SSE/Redis bên trong → `01-ARCHITECTURE.md`; checklist bảo mật → `05-SECURITY.md`.
@@ -34,11 +34,11 @@
 | GET | `/api/v1/courses/{courseSlug}` | Chi tiết khóa | Không | Không | ĐÃ CÓ |
 | GET | `/api/v1/courses/{courseSlug}/lessons/{lessonSlug}` | Chi tiết bài học | Không | Không | ĐÃ CÓ |
 | GET | `/api/v1/exercises/{exerciseId}` | Xem Exercise + test công khai | Không | Không | ĐÃ CÓ (T2b) |
-| POST | `/api/v1/exercises/{exerciseId}/submissions` | Nộp bài | Có | Học viên (đề xuất) | ĐỀ XUẤT |
-| GET | `/api/v1/submissions/{submissionId}` | Trạng thái/kết quả một submission (polling) | Có | Chủ submission | ĐỀ XUẤT |
-| GET | `/api/v1/submissions/{submissionId}/events` | SSE theo dõi kết quả | Có (`TODO`) | Chủ submission | ĐỀ XUẤT |
-| GET | `/api/v1/exercises/{exerciseId}/submissions?page=0&size=20` | Lịch sử nộp theo bài tập | Có | Chủ | ĐỀ XUẤT |
-| GET | `/api/v1/submissions/{submissionId}/detail` | Xem lại: mã nguồn + kết quả từng test | Có | Chủ | ĐỀ XUẤT |
+| POST | `/api/v1/exercises/{exerciseId}/submissions` | Nộp bài | Có + CSRF | LEARNER trở lên | ĐÃ CÓ |
+| GET | `/api/v1/submissions/{submissionId}` | Trạng thái/kết quả một submission (polling) | Có | Chủ submission | ĐÃ CÓ |
+| GET | `/api/v1/submissions/{submissionId}/events` | SSE theo dõi kết quả | Chưa chốt | Chủ submission | CHƯA CÓ |
+| GET | `/api/v1/exercises/{exerciseId}/submissions?page=0&size=20` | Lịch sử nộp theo bài tập | Có | Chủ | ĐÃ CÓ |
+| GET | `/api/v1/submissions/{submissionId}/detail` | Xem lại: mã nguồn + kết quả từng test | Có | Chủ | ĐÃ CÓ |
 | GET/PUT | `/api/v1/admin/sandbox-limits` | Đọc/sửa config giới hạn (AD-03) | Có | Quản trị | ĐỀ XUẤT, `TODO(xác nhận)` có làm không |
 
 - Bảng exercise: `{exerciseId}` là id `bigint` của `exercise` (`02-DATA-MODEL.md`).

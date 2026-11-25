@@ -20,6 +20,7 @@ bash ./mvnw -Dspring-boot.run.profiles=dev spring-boot:run
 | --- | --- |
 | `DB_NAME`, `DB_PORT` | Tên DB local và cổng host của Compose. Mặc định `learn_platform` và `5432`. |
 | `DB_URL`, `DB_USER`, `DB_PASSWORD` | Datasource. Ngoài profile `dev`, cung cấp đủ ba biến. |
+| `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD` | Redis cho rate limit và hàng đợi submission. Compose dev chỉ bind Redis vào loopback. |
 | `SERVER_PORT`, `SERVER_ADDRESS` | Cổng mặc định `8080`. Address của profile `dev` mặc định `127.0.0.1`. |
 | `FRONTEND_ORIGINS` | Danh sách origin phân cách bằng dấu phẩy. Local mặc định localhost và 127.0.0.1 cổng 3000. |
 | `TEST_DB_URL`, `TEST_DB_USER`, `TEST_DB_PASSWORD` | Datasource riêng cho integration test. |
@@ -36,6 +37,21 @@ $env:TEST_DB_PASSWORD = 'learn_dev_password'
 ```
 
 Trên macOS/Linux, export ba biến `TEST_DB_*` tương ứng rồi chạy `bash ./mvnw verify`. Nếu cổng DB bị chiếm, đổi `DB_PORT` và URL test. Nếu readiness lỗi, xem `docker compose --env-file .env -f infra/docker-compose.dev.yml ps` và log Flyway. Dừng API bằng `Ctrl+C`. Từ repo root, chạy `docker compose --env-file .env -f infra/docker-compose.dev.yml down` để giữ volume.
+
+## Sandbox: nộp bài và worker
+
+Compose dev khởi động PostgreSQL và Redis. API trong profile `dev` nhận submission và đưa ID vào Redis; chạy API không tự chạy mã học viên. Worker là tiến trình riêng, profile `worker`, và cần kết nối tới một Judge0 đã được dựng trong môi trường cô lập.
+
+Không khởi động worker trỏ tới Judge0 dùng chung hoặc production để thử mã tùy ý. Chưa xác minh Judge0 thật, cô lập mạng/tài nguyên, hay các bài nghiệm thu N2/N4; hiện CI và test local chỉ dùng HTTP stub an toàn.
+
+Worker cần các biến `DB_URL`, `DB_USER`, `DB_PASSWORD`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `JUDGE0_BASE_URL` và `JUDGE0_PYTHON_LANGUAGE_ID`. Chỉ đặt `JUDGE0_AUTH_TOKEN` nếu Judge0 yêu cầu. Chạy riêng trong terminal đã được cấu hình các biến môi trường:
+
+```bash
+cd backend
+bash ./mvnw -Dspring-boot.run.profiles=worker spring-boot:run
+```
+
+Submission API, quyền truy cập, mã lỗi và polling được mô tả trong [OpenAPI](api/openapi.yaml). SSE chưa được triển khai.
 
 ## Chạy cả backend bằng Compose
 

@@ -9,8 +9,8 @@
 ## 2. Bối cảnh ngắn
 
 - Nền tảng học lập trình trực tuyến tích hợp trợ lý AI (đồ án ~16 tuần, nhóm nhỏ; hai khóa pilot: Web cơ bản HTML/CSS/JS và Python cơ bản). Phân hệ Sandbox và chấm bài (SB) là một trong ba trụ cột, cạnh Roadmap tương tác và Trợ lý AI gia sư.
-- **ĐÃ CÓ (mã):** backend Java 21, Spring Boot 4.1.0, PostgreSQL 16, JDBC (`JdbcClient`), Flyway. API catalog chỉ đọc (course, lesson), security stateless chỉ whitelist GET, lỗi `problem+json`, test tích hợp cần `TEST_DB_URL`, CI chạy `./mvnw verify`.
-- **CHƯA CÓ:** auth/phân quyền, frontend, nộp bài, sandbox chấm mã, trợ lý AI, SSE, queue/worker, Redis, staging/production. Mọi thứ trong bộ `docs/sandbox/*` là **kế hoạch**, không phải mã đang chạy.
+- **ĐÃ CÓ (mã):** backend Java 21, Spring Boot 4.1.0, PostgreSQL 16, JDBC (`JdbcClient`), Flyway, catalog/read Exercise API, session-authenticated submission/polling/history/detail, Redis rate limit/queue, worker profile riêng và Judge0 adapter. CI chạy PostgreSQL + Redis.
+- **CHƯA NGHIỆM THU:** Judge0 thật, isolation/mạng/tài nguyên, N2/N4 và tải. SSE, frontend, trợ lý AI, staging/production chưa có. Tài liệu `docs/sandbox/*` vẫn là đặc tả/checklist và không thay thế bằng chứng nghiệm thu thật.
 
 ## 3. Trong phạm vi (backend P1)
 

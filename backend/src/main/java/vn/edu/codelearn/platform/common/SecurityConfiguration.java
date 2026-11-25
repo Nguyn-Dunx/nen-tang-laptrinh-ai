@@ -39,6 +39,14 @@ class SecurityConfiguration {
     private static final String AUTH_API = "/api/v1/auth";
     private static final PathPatternRequestMatcher PROFILE =
             pathPattern(HttpMethod.GET, AUTH_API + "/me");
+    private static final PathPatternRequestMatcher SUBMISSION_CREATE =
+            pathPattern(HttpMethod.POST, "/api/v1/exercises/{exerciseId}/submissions");
+    private static final PathPatternRequestMatcher SUBMISSION_READ =
+            pathPattern(HttpMethod.GET, "/api/v1/submissions/{submissionId}");
+    private static final PathPatternRequestMatcher SUBMISSION_DETAIL =
+            pathPattern(HttpMethod.GET, "/api/v1/submissions/{submissionId}/detail");
+    private static final PathPatternRequestMatcher SUBMISSION_HISTORY =
+            pathPattern(HttpMethod.GET, "/api/v1/exercises/{exerciseId}/submissions");
 
     @Bean
     SecurityFilterChain securityFilterChain(
@@ -73,7 +81,7 @@ class SecurityConfiguration {
                                                                 request,
                                                                 response,
                                                                 null,
-                                                                PROFILE.matches(request)
+                                                                requiresAuthentication(request)
                                                                         ? new ResponseStatusException(
                                                                                 HttpStatus
                                                                                         .UNAUTHORIZED)
@@ -104,8 +112,20 @@ class SecurityConfiguration {
                 .anonymous()
                 .requestMatchers(PROFILE)
                 .authenticated()
+                .requestMatchers(SUBMISSION_CREATE)
+                .hasAnyRole("LEARNER", "AUTHOR", "ADMIN")
+                .requestMatchers(SUBMISSION_READ, SUBMISSION_DETAIL, SUBMISSION_HISTORY)
+                .hasAnyRole("LEARNER", "AUTHOR", "ADMIN")
                 .anyRequest()
                 .denyAll();
+    }
+
+    private boolean requiresAuthentication(jakarta.servlet.http.HttpServletRequest request) {
+        return PROFILE.matches(request)
+                || SUBMISSION_CREATE.matches(request)
+                || SUBMISSION_READ.matches(request)
+                || SUBMISSION_DETAIL.matches(request)
+                || SUBMISSION_HISTORY.matches(request);
     }
 
     @Bean
@@ -140,8 +160,16 @@ class SecurityConfiguration {
         auth.setAllowCredentials(true);
         auth.validateAllowCredentials();
 
+        CorsConfiguration submissions = new CorsConfiguration(config);
+        submissions.setAllowedMethods(List.of("GET", "POST"));
+        submissions.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
+        submissions.setAllowCredentials(true);
+        submissions.validateAllowCredentials();
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration(AUTH_API + "/**", auth);
+        source.registerCorsConfiguration("/api/v1/exercises/*/submissions", submissions);
+        source.registerCorsConfiguration("/api/v1/submissions/**", submissions);
         source.registerCorsConfiguration("/api/v1/**", config);
         return source;
     }
