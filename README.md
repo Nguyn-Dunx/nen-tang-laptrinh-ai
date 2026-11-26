@@ -5,6 +5,10 @@
 
 # Backend nền tảng học lập trình
 
+## Frontend EduSky
+
+FE nằm trong `frontend/`, dùng Next.js, React và TypeScript. Đã nối danh mục khóa học, đọc bài, tài khoản, nộp bài Python, lịch sử chấm và quản trị khóa học. Sau khi backend chạy, mở terminal khác và chạy `cd frontend`, `npm ci`, `npm run dev`. Truy cập `http://127.0.0.1:3000`. [Hướng dẫn frontend](frontend/README.md)
+
 Nền tảng giúp người mới và sinh viên học theo roadmap, thực hành và hỏi AI theo ngữ cảnh. Backend hiện có quản trị Khóa học, tài khoản, health và Sandbox. Profile `dev` có khóa **Python cơ bản** gồm sáu bài mẫu và ba bài tập. Stack gồm Java 21, Spring Boot, PostgreSQL, Flyway và Redis.
 
 ## Chạy nhanh trên Windows

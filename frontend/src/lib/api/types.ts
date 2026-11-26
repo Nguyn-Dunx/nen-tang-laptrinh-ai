@@ -1,0 +1,35 @@
+import type { components } from "./schema";
+
+type Schema = components["schemas"];
+
+export type Account = Schema["AccountView"];
+export type CsrfToken = Schema["CsrfToken"];
+export type Credentials = Schema["LoginRequest"];
+export type ProblemDetail = Schema["ProblemDetail"];
+export type CourseSummary = Schema["CourseSummary"];
+export type CoursePage = Schema["CoursePage"];
+export type CourseDetail = Schema["CourseDetail"];
+export type LessonSummary = Schema["LessonSummary"];
+export type LessonDetail = Schema["LessonDetail"];
+export type LessonExerciseSummary = Schema["LessonExerciseSummary"];
+export type ExerciseView = Schema["ExerciseView"];
+export type Exercise = ExerciseView;
+export type PublicTestCase = Schema["PublicTestCase"];
+export type CreateSubmission = Schema["CreateSubmission"];
+export type SubmissionReceipt = Schema["SubmissionReceipt"];
+export type SubmissionView = Schema["SubmissionView"];
+export type SubmissionDetail = Schema["SubmissionDetail"];
+export type SubmissionSummary = Schema["SubmissionSummary"];
+export type SubmissionPage = Schema["SubmissionPage"];
+export type SubmissionTestResult = Schema["SubmissionTestResult"];
+export type AdminCourseItem = Schema["AdminCourseItem"];
+export type AdminCoursePage = Schema["AdminCoursePage"];
+export type AdminCourseDetail = Schema["AdminCourseDetail"];
+export type AdminLessonItem = Schema["AdminLessonItem"];
+export type AdminLessonDetail = Schema["AdminLessonDetail"];
+export type CreateCourse = Schema["CreateCourse"];
+export type UpdateCourse = Schema["UpdateCourse"];
+export type CreateLesson = Schema["CreateLesson"];
+export type UpdateLesson = Schema["UpdateLesson"];
+export type CoursePublication = Schema["CoursePublication"];
+export type LessonOrder = Schema["LessonOrder"];
